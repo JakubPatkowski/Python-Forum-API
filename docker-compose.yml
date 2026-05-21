@@ -1,0 +1,75 @@
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — single-node, dev-only credentials, ephemeral volume.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: forum_wedkarskie
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Backend — FastAPI app run with uv. The bind-mount of ./backend gives
+  # hot reload during development; uv resolves dependencies at build time.
+  # ---------------------------------------------------------------------------
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/forum_wedkarskie
+      SECRET_KEY: dev-secret-key-change-me
+      DEBUG: "true"
+      UPLOAD_DIR: /app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      # Keep the prebuilt venv from the image; the bind-mount above would
+      # otherwise hide it under the host's empty directory.
+      - backend_venv:/app/.venv
+    # Apply migrations on every dev boot, then start uvicorn with reload.
+    command: >
+      bash -lc "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    networks:
+      default:
+        aliases:
+          - backend-service
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Vite production build served by nginx.
+  # ---------------------------------------------------------------------------
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin — DB browser for local development.
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@forum.pl
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  backend_venv:

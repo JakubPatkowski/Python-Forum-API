@@ -1,0 +1,145 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+downloads/
+*.egg
+*.egg-info/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.manifest
+*.spec
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Local Python version pins for tools that pick them up (uv, pyenv).
+# `.python-version` is committed on purpose — it pins the project's Python.
+# So do NOT add it here. Other pyenv-related files can be ignored:
+.tool-versions
+
+# ---------------------------------------------------------------------------
+# Test / coverage / type-check caches
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# ---------------------------------------------------------------------------
+# Node / pnpm / Vite
+# ---------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/install-state.gz
+.yarn/build-state.yml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite build output
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# ---------------------------------------------------------------------------
+# Environment variables / secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+
+# Real k8s Secret files (only .example.yaml templates are committed).
+k8s/**/secret.yaml
+!k8s/**/secret.example.yaml
+
+# ---------------------------------------------------------------------------
+# Database / local data
+# ---------------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+backend/uploads/
+!backend/uploads/.gitkeep
+
+# ---------------------------------------------------------------------------
+# IDE / editor
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# Logs / temporary files
+# ---------------------------------------------------------------------------
+*.log
+*.log.*
+*.tmp
+*.bak
+.cache/
+
+# ---------------------------------------------------------------------------
+# Docker / build tooling
+# ---------------------------------------------------------------------------
+docker-compose.override.yml
+*.tar
+*.tar.gz
+
+# ---------------------------------------------------------------------------
+# Project-specific
+# ---------------------------------------------------------------------------
+# Auto-generated client SDK (if regenerated from OpenAPI later).
+frontend/src/api-client/
+
+# Local kubeconfig overrides used during development.
+*.kubeconfig
+
+# Legacy dashboard.html in repo root — was a one-off mockup, do not commit.
+/dashboard.html
+
+# Claude
+CLAUDE.md
+memory/
+.vscode/prompts/

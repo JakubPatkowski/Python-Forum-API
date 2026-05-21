@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% block title %}Użytkownicy{% endblock %}
+{% block content %}
+<h2>Użytkownicy ({{ users|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th><th>Login</th><th>Email</th><th>Rola</th><th>Aktywne</th><th>Utworzony</th><th>Akcje</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.email }}</td>
+            <td>
+                <form method="post" action="/admin/users/{{ u.id }}/role" style="display:inline;">
+                    <select name="role">
+                        {% for r in roles %}
+                        <option value="{{ r.value }}" {% if r == u.role %}selected{% endif %}>{{ r.value }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-small">Zmień</button>
+                </form>
+            </td>
+            <td>{% if u.is_active %}✔{% else %}✗{% endif %}</td>
+            <td>{{ u.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>
+                <form method="post" action="/admin/users/{{ u.id }}/toggle-active" style="display:inline;">
+                    <button type="submit" class="btn btn-small btn-warning">{% if u.is_active %}Zablokuj{% else %}Odblokuj{% endif %}</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

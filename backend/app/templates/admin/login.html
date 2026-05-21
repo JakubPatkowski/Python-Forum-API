@@ -1,0 +1,19 @@
+{% extends "admin/base.html" %}
+{% block title %}Logowanie{% endblock %}
+{% block content %}
+<div class="login-card">
+    <h2>Logowanie do panelu</h2>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/admin/login">
+        <label>
+            Login
+            <input type="text" name="username" required autofocus>
+        </label>
+        <label>
+            Hasło
+            <input type="password" name="password" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Zaloguj</button>
+    </form>
+</div>
+{% endblock %}

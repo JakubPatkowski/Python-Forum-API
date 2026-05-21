@@ -1,0 +1,186 @@
+[project]
+name = "forum-wedkarskie-backend"
+version = "0.3.0"
+description = "Fishing forum — FastAPI backend (Clean Architecture + modular monolith)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Jakub Patkowski" }]
+
+# Runtime dependencies.
+# Keep this list curated; add only what is actually imported by the application.
+dependencies = [
+    # HTTP framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",      # multipart/form-data (file uploads)
+
+    # Persistence
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary,pool]>=3.2.0",   # psycopg3 — modern, async-ready
+    "alembic>=1.14.0",
+
+    # Validation / settings
+    "pydantic[email]>=2.10.0",
+    "pydantic-settings>=2.6.0",
+
+    # Auth
+    "pyjwt>=2.10.0",
+    "argon2-cffi>=23.1.0",
+
+    # File processing
+    "python-magic>=0.4.27",          # MIME sniffing
+    # On Windows, libmagic comes from a separate wheel:
+    "python-magic-bin>=0.4.14; sys_platform == 'win32'",
+
+    # Logging
+    "structlog>=24.4.0",
+
+    # Templating (admin panel SSR)
+    "jinja2>=3.1.4",
+
+    # Observability (used from phase 7, listed now for stability)
+    "prometheus-fastapi-instrumentator>=7.0.0",
+
+    # Event bus (used from phase 4)
+    "aio-pika>=9.5.0",
+]
+
+[dependency-groups]
+# Development tooling: linters, type-checker, tests.
+# Installed by `uv sync` automatically (uv reads PEP 735 dependency-groups).
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",                 # for AsyncClient in tests
+    "testcontainers[postgres,rabbitmq]>=4.8.0",
+
+    # Type stubs
+    "types-python-jose>=3.3.0",
+]
+
+# -----------------------------------------------------------------------------
+# uv configuration
+# -----------------------------------------------------------------------------
+[tool.uv]
+package = false                       # backend is an application, not a library
+managed = true
+
+# -----------------------------------------------------------------------------
+# Ruff — linter + formatter
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Legacy folders (app/core, app/models, app/routers, app/schemas, app/services) are
+# scheduled for removal in phases 1-3 of the migration plan — there is no point
+# polishing their lint. They are still imported at runtime via main.py.
+extend-exclude = [
+    "alembic/versions",
+    "app/core",
+    "app/models",
+    "app/routers",
+    "app/schemas",
+    "app/services",
+    "app/templates",
+    "app/static",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # flake8-bugbear
+    "UP",       # pyupgrade
+    "N",        # pep8-naming
+    "S",        # bandit (security)
+    "RUF",      # ruff-specific
+    "ASYNC",    # async best practices
+    "SIM",      # simplifications
+    "C4",       # comprehensions
+]
+ignore = [
+    "S101",     # use of assert (we use it in tests)
+    "B008",     # function-call-in-default — FastAPI Depends() is fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S106"]         # asserts & hardcoded passwords OK in tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+# -----------------------------------------------------------------------------
+# Mypy — strict type checking
+# -----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# `warn_unused_configs` would complain about overrides for modules that are
+# not yet imported anywhere (magic, aio_pika, argon2 land in phases 3-4).
+# We re-enable once those modules are actually used.
+warn_unused_configs = false
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_decorators = true
+plugins = ["pydantic.mypy"]
+# Same rationale as ruff: legacy modules will be replaced in phases 1-3.
+exclude = [
+    "alembic/versions/",
+    "app/core/",
+    "app/models/",
+    "app/routers/",
+    "app/schemas/",
+    "app/services/",
+]
+
+# Third-party libs without type stubs — silence import errors here.
+[[tool.mypy.overrides]]
+module = [
+    "magic",
+    "magic.*",
+    "aio_pika",
+    "aio_pika.*",
+    "argon2",
+    "argon2.*",
+]
+ignore_missing_imports = true
+
+# -----------------------------------------------------------------------------
+# Pytest
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "-p", "no:cacheprovider",
+]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: pure domain tests, no I/O",
+    "integration: testcontainers Postgres / RabbitMQ",
+    "e2e: full HTTP-level tests against running app",
+]
+
+# -----------------------------------------------------------------------------
+# Coverage
+# -----------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "alembic/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Panel admina{% endblock %} — Forum Wędkarskie</title>
+    <link rel="stylesheet" href="/static/admin/style.css">
+</head>
+<body>
+    <header class="admin-header">
+        <h1>Forum Wędkarskie — panel administratora</h1>
+        {% if admin is defined and admin %}
+        <div class="admin-user">
+            Zalogowany: <strong>{{ admin.username }}</strong> ({{ admin.role.value }})
+            <form method="post" action="/admin/logout" style="display:inline;">
+                <button type="submit" class="btn btn-secondary">Wyloguj</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    {% if admin is defined and admin %}
+    <nav class="admin-nav">
+        <a href="/admin/">Dashboard</a>
+        <a href="/admin/users">Użytkownicy</a>
+        <a href="/admin/posts">Posty</a>
+        <a href="/admin/comments">Komentarze</a>
+        <a href="/admin/attachments">Załączniki</a>
+    </nav>
+    {% endif %}
+
+    <main class="admin-main">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

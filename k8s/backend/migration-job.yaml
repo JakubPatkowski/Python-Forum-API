@@ -1,0 +1,48 @@
+# Runs `alembic upgrade head` before the backend Deployment is rolled out.
+#
+# Why a Job (and not an initContainer)?
+# - With `replicas > 1`, every pod would race for the migration lock; a Job
+#   runs exactly once per deploy.
+# - Failure surfaces clearly in `kubectl get jobs` instead of a CrashLoopBackOff
+#   on every pod.
+#
+# Apply order in scripts/deploy.sh:
+#   1. kubectl apply -f k8s/postgres/
+#   2. kubectl wait pod -l app=postgres --for=condition=ready
+#   3. kubectl delete job backend-migrate --ignore-not-found
+#   4. kubectl apply -f k8s/backend/migration-job.yaml
+#   5. kubectl wait --for=condition=complete job/backend-migrate
+#   6. kubectl apply -f k8s/backend/    # deployment, service, hpa, ...
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate
+  namespace: forum-wedkarskie
+  labels:
+    app: backend
+    component: migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: forum-wedkarskie-backend:latest
+          imagePullPolicy: Never
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

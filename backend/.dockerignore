@@ -1,0 +1,29 @@
+# Local virtual environments — never copy them into the image.
+.venv/
+venv/
+.env*
+
+# Caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Tooling
+.idea/
+.vscode/
+.git/
+.gitignore
+
+# Build outputs and uploads (the uploads PVC mounts here in k8s)
+dist/
+build/
+uploads/
+
+# Docs / notes that do not belong in a runtime image
+*.md
