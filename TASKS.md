@@ -22,14 +22,18 @@
 
 ### Faza 1 — Moduł identity (auth + RBAC + ACL)
 
-- [ ] (v3-F1) Domain: `User` AR z metodami register/block/assign_role/grant_permission, `Email`/`Username` VO, `Role`, `Permission`, `RefreshToken`
-- [ ] (v3-F1) Application: porty + use case'y `register/login/refresh/logout/assign_role/grant_permission`
-- [ ] (v3-F1) Infrastructure: SQLAlchemy ORM, repozytoria, mappery, `Argon2Hasher`, `PyJWTTokenService`
-- [ ] (v3-F1) Presentation: routery `/api/v1/auth/*`, `/api/v1/users/*`, `/api/v1/admin/users/*`
-- [ ] (v3-F1) Migracje `0002_create_identity_tables.py`, `0003_seed_identity.py` (permissions + role bundles)
-- [ ] (v3-F1) Refresh token rotation + reuse detection (wg `docs/03-security.md` 2.3)
-- [ ] (v3-F1) Testy unit (domena) + integration (auth flow z testcontainers Postgres)
-- [ ] (v3-F1) Usuń stare `routers/auth.py`, `routers/users.py`
+- [x] (v3-F1) Domain: `User` AR z metodami register/block/assign_role/grant_permission, `Email`/`Username` VO, `Role`, `Permission`, `RefreshToken`
+- [x] (v3-F1) Application: porty + use case'y `register/login/refresh/logout/assign_role/grant_permission` (+ `set_user_status`, `deny_permission`)
+- [x] (v3-F1) Infrastructure: SQLAlchemy ORM, repozytoria, mappery, `Argon2Hasher`, `PyJWTTokenService`
+- [x] (v3-F1) Presentation: routery `/api/v1/auth/*`, `/api/v1/users/*`, `/api/v1/admin/users/*`
+- [x] (v3-F1) Migracje `0002_create_identity_tables.py`, `0003_seed_identity.py` (permissions + role bundles, backfill user_roles z legacy `users.role`)
+- [x] (v3-F1) Refresh token rotation + reuse detection (`token_hash = sha256(jwt)`, rotacja → `status=rotated`, ponowne użycie → `revoke_chain_from` + `revoke_all_for_user` + event `RefreshTokenReuseDetected`)
+- [x] (v3-F1) Testy unit (VO Email/Username/RawPassword, User aggregate, RefreshToken, PyJWTTokenService) + szkielet integration (`tests/integration/identity/test_auth_flow.py` z testcontainers)
+- [x] (v3-F1) Stare `routers/auth.py`, `routers/users.py` zamienione na stub-y `raise ImportError`, `main.py` montuje tylko nowe `/api/v1/*`
+- [x] (v3-F1) **DODANO**: rozszerzenie `app/models/user.py` o nowe kolumny (`public_id`, `password_hash`, `status`, `avatar_file_id`, `updated_at`) — jedna ORM klasa na `users`, legacy kolumny zostają do fazy 2
+- [x] (v3-F1) **DODANO**: `app/core/deps.py` honoruje oba warianty JWT (`sub=UUID` z nowych, `sub=username` z legacy) — żeby legacy `/api/posts|comments|attachments` działało z nowym access tokenem
+- [x] (v3-F1) **DODANO**: `app/container.py` z DI (`@lru_cache` dla bus/hasher/token-service, per-request UoW i use-case'y)
+- [ ] (v3-F1) `ruff check .`, `mypy app/` lokalnie po `uv sync` (workspace bash ma Python 3.10; py_compile zielony dla wszystkich nowych plików na Pythonie 3.12)
 
 ### Faza 2 — Moduł content (posts + comments z materialized path)
 

@@ -12,8 +12,7 @@ Boot sequence (in order):
 4. Register global exception handlers from `shared.presentation`.
 5. Ensure uploads directory exists (mounted as PVC in k8s).
 6. Mount static files for the admin SSR panel.
-7. Include legacy routers (`/api/*`) — they will be migrated to modular
-   monolith versions in phases 1-3.
+7. Include routers — phase-1 ``/api/v1/*`` and legacy ``/api/*``.
 8. Include admin SSR panel under `/admin`.
 9. Wire health-check endpoints.
 
@@ -66,21 +65,24 @@ def create_app() -> FastAPI:
     static_dir = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-    # Step 7 — legacy routers. These will be replaced module-by-module
-    # in phases 1-3; the imports stay inside the factory to avoid heavy
-    # imports at module load time (especially useful for tests).
-    from app.routers import (
-        admin,
-        attachments,
-        auth,
-        categories,
-        comments,
-        posts,
-        users,
+    # Step 7a — phase-1 identity routers (Clean Architecture, modular monolith).
+    from app.modules.identity.presentation import (
+        admin_users_router,
+        auth_router,
+        users_router,
     )
 
-    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-    app.include_router(users.router, prefix="/api/users", tags=["users"])
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+    app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
+    app.include_router(
+        admin_users_router, prefix="/api/v1/admin/users", tags=["admin-users"]
+    )
+
+    # Step 7b — legacy routers awaiting migration in phases 2-3.
+    # Auth & users were retired in phase 1; the rest still use the old
+    # ORM/services layer but accept phase-1 JWTs through `core/deps.py`.
+    from app.routers import admin, attachments, categories, comments, posts
+
     app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
     app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
     app.include_router(comments.router, prefix="/api/comments", tags=["comments"])

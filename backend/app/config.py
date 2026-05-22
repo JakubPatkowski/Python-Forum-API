@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     # JWT
     SECRET_KEY: str = "zmien-ten-klucz-na-produkcji"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    REFRESH_COOKIE_NAME: str = "refresh_token"
+    REFRESH_COOKIE_SECURE: bool = False  # set True behind HTTPS
 
     # Aplikacja
     APP_NAME: str = "Forum Wędkarskie API"

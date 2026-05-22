@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-import app.models  # noqa: F401 - side-effect import registers ORM mappers on Base.metadata
+import app.models  # noqa: F401 - side-effect import registers legacy ORM mappers
+import app.modules.identity.infrastructure.orm  # noqa: F401 - phase-1 mappers
 from alembic import context
 from app.config import settings
 from app.shared.infrastructure.db import Base

@@ -14,7 +14,15 @@ _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fal
 
 
 def _user_from_token(token: str, db: Session) -> User:
-    """Dekoduje token i pobiera użytkownika z bazy. Rzuca 401 gdy cokolwiek nie gra."""
+    """Dekoduje token i pobiera użytkownika z bazy. Rzuca 401 gdy cokolwiek nie gra.
+
+    Po fazie 1: ``sub`` w nowych access tokenach jest UUID-em (``users.public_id``).
+    Legacy tokeny miały ``sub == username``. Obsługujemy oba warianty, żeby legacy
+    routery (posts/comments/attachments/categories) działały z nowym JWT — będą
+    wycofywane w fazach 2-3.
+    """
+    from uuid import UUID
+
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Nieprawidłowe dane uwierzytelniające",
@@ -22,13 +30,24 @@ def _user_from_token(token: str, db: Session) -> User:
     )
     try:
         payload = decode_access_token(token)
-        username = payload.get("sub")
-        if not isinstance(username, str):
-            raise credentials_exc
     except JWTDecodeError:
         raise credentials_exc
 
-    user = db.query(User).filter(User.username == username).first()
+    sub = payload.get("sub")
+    if not isinstance(sub, str) or not sub:
+        raise credentials_exc
+
+    user: User | None = None
+    # Phase-1: sub is the user's public UUID.
+    try:
+        sub_uuid = UUID(sub)
+    except ValueError:
+        sub_uuid = None
+    if sub_uuid is not None:
+        user = db.query(User).filter(User.public_id == sub_uuid).first()
+    if user is None:
+        # Legacy fallback — sub used to carry the username.
+        user = db.query(User).filter(User.username == sub).first()
     if user is None or not user.is_active:
         raise credentials_exc
     return user
