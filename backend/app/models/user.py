@@ -54,7 +54,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     role = Column(
-        SAEnum(UserRole, name="user_role"),
+        SAEnum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
         default=UserRole.USER,
         nullable=False,
         index=True,
@@ -64,7 +64,7 @@ class User(Base):
     # --- phase-1 auth (Argon2 hash, status enum, avatar, updated_at) -------
     password_hash = Column(String(255), nullable=True)
     status = Column(
-        SAEnum(UserStatus, name="user_status"),
+        SAEnum(UserStatus, name="user_status", values_callable=lambda e: [m.value for m in e]),
         nullable=True,
     )
     avatar_file_id = Column(BigInteger, nullable=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
 from app.modules.identity.application.commands import (
     LoginCommand,
@@ -35,7 +35,11 @@ class LoginRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    username_or_email: str = Field(min_length=1, max_length=255)
+    username_or_email: str = Field(
+        validation_alias=AliasChoices("login", "username_or_email"),
+        min_length=1,
+        max_length=255,
+    )
     password: str = Field(min_length=1, max_length=128)
 
     def to_command(

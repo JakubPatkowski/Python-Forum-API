@@ -18,6 +18,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
@@ -28,12 +29,15 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # ----- ENUM types --------------------------------------------------------
-    user_role = sa.Enum("user", "moderator", "admin", name="user_role")
-    content_format = sa.Enum("plain", "markdown", name="content_format")
-
+    # Używamy postgresql.ENUM (nie sa.Enum) bo tylko dialektowy typ respektuje
+    # create_type=False i nie wywołuje _on_table_create po raz drugi.
+    # Wzorzec identyczny jak w 0002_create_identity_tables.py.
     bind = op.get_bind()
-    user_role.create(bind, checkfirst=True)
-    content_format.create(bind, checkfirst=True)
+    postgresql.ENUM("user", "moderator", "admin", name="user_role").create(bind, checkfirst=True)
+    postgresql.ENUM("plain", "markdown", name="content_format").create(bind, checkfirst=True)
+
+    user_role = postgresql.ENUM("user", "moderator", "admin", name="user_role", create_type=False)
+    content_format = postgresql.ENUM("plain", "markdown", name="content_format", create_type=False)
 
     # ----- users -------------------------------------------------------------
     op.create_table(

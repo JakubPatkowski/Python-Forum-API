@@ -82,7 +82,7 @@ def upgrade() -> None:
         )
     op.execute("UPDATE users SET password_hash = hashed_password WHERE password_hash IS NULL")
     op.execute(
-        "UPDATE users SET status = CASE WHEN is_active THEN 'active' ELSE 'blocked' END "
+        "UPDATE users SET status = CASE WHEN is_active THEN 'active'::user_status ELSE 'blocked'::user_status END "
         "WHERE status IS NULL"
     )
 

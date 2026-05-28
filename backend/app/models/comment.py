@@ -15,7 +15,7 @@ class Comment(Base):
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False)
     content_format = Column(
-        SAEnum(ContentFormat, name="content_format"),
+        SAEnum(ContentFormat, name="content_format", values_callable=lambda e: [m.value for m in e]),
         default=ContentFormat.MARKDOWN,
         nullable=False,
     )
