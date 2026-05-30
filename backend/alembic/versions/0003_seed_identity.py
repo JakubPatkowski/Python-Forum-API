@@ -131,17 +131,24 @@ def upgrade() -> None:
     # --- backfill user_roles from legacy ``users.role`` --------------------
     # Each existing user gets the matching phase-1 role assignment so legacy
     # accounts keep working with the new RBAC tables.
-    bind.execute(
-        sa.text(
-            """
-            INSERT INTO user_roles (user_id, role_id)
-            SELECT u.id, r.id
-            FROM users u
-            JOIN roles r ON r.name = u.role::text
-            ON CONFLICT DO NOTHING
-            """
+    # Guard: the ``role`` column only exists when 0001 ran on a *fresh* DB
+    # (the baseline guard skips CREATE TABLE when ``users`` already existed,
+    # so older volumes may not have it).
+    has_role_col = "role" in {
+        c["name"] for c in sa.inspect(bind).get_columns("users")
+    }
+    if has_role_col:
+        bind.execute(
+            sa.text(
+                """
+                INSERT INTO user_roles (user_id, role_id)
+                SELECT u.id, r.id
+                FROM users u
+                JOIN roles r ON r.name = u.role::text
+                ON CONFLICT DO NOTHING
+                """
+            )
         )
-    )
 
 
 def downgrade() -> None:
