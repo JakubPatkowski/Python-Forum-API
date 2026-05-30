@@ -3,10 +3,9 @@
 ## 1. Konwencje
 
 - **PK wewnętrzne:** `bigserial` (kolumna `id`). Nigdy nie wystawiane w API.
-- **Klucze publiczne:** `uuid` (UUIDv7, sortowalne czasowo) w kolumnie `public_id`,
-  `unique not null default gen_random_uuid()` (lub funkcja `uuid_generate_v7()` z extension).
-  *Pragmatyzm:* jeśli `uuid_generate_v7()` nie jest dostępne, używamy `gen_random_uuid()` (v4)
-  i sortujemy po `created_at`.
+- **Klucze publiczne:** `uuid` (v4) w kolumnie `public_id`,
+  `unique not null default gen_random_uuid()`.
+  Sortowanie po `(created_at, public_id)` zamiast polegania na UUID v7.
 - **Timestampy:** `timestamptz`, domyślnie `now()`, dla `updated_at` używamy triggera lub
   ustawiamy w aplikacji (SQLAlchemy `onupdate=...`).
 - **Soft delete:** kolumna `is_deleted boolean default false`. Dla komentarzy obowiązkowo —
@@ -468,7 +467,7 @@ nie wykrywa fałszywych "zmian" przy każdej migracji.
 
 ### 7.5 Migration Job w k8s
 
-Zamiast init-containera (race condition przy `replicas: N`), używamy `Job`:
+Migracja jako Kubernetes **Job** (nie init-container — eliminuje race condition przy `replicas: N`):
 
 ```yaml
 # k8s/backend/migration-job.yaml

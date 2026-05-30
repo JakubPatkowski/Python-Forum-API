@@ -266,7 +266,7 @@ modules/content/
 - `POST /api/v1/comments` z `parent_id=X` → `depth=parent.depth+1`, `path=parent.path + '.' + own_id`.
 - `GET /api/v1/posts/{id}/comments?tree=true` → drzewo w kolejności DFS (sort by `path`).
 - `DELETE /api/v1/comments/{id}` → soft delete (`is_deleted=true`, content="[deleted]"), children zostają.
-- Walidacja `MAX_COMMENT_DEPTH` (configurable, domyślnie 8).
+- Walidacja `MAX_COMMENT_DEPTH` (configurable, domyślnie 5).
 - Keyset pagination `GET /api/v1/posts?cursor=...&limit=20`.
 
 ### Prompt startowy

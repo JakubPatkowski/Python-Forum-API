@@ -28,10 +28,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
 from app.shared.infrastructure.logging import configure_logging
 from app.shared.presentation import register_exception_handlers
+from app.shared.presentation.middleware import (
+    LimitUploadSizeMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 
 def create_app() -> FastAPI:
@@ -46,13 +51,21 @@ def create_app() -> FastAPI:
         version="0.3.0",
     )
 
-    # Step 3 — middleware.
+    # Step 3 — middleware (LIFO: last added = first executed).
+    # 3a. CORS (must be outermost to set headers on preflight).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ALLOW_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    # 3b. Security headers (X-Frame-Options, HSTS, CSP, etc.).
+    app.add_middleware(SecurityHeadersMiddleware)
+    # 3c. Upload size guard — 411 / 413 before body is read.
+    app.add_middleware(
+        LimitUploadSizeMiddleware,
+        max_upload_size=settings.MAX_UPLOAD_SIZE_BYTES,
     )
 
     # Step 4 — exception handlers (DomainError, validation, fallback).
@@ -114,6 +127,9 @@ def create_app() -> FastAPI:
 
     # Step 9 — health-check endpoints.
     _register_health_routes(app)
+
+    # Step 10 — Prometheus metrics (endpoint /metrics).
+    Instrumentator().instrument(app).expose(app)
 
     return app
 

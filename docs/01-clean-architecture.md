@@ -64,7 +64,7 @@ backend/
     │   ├── domain/
     │   │   ├── entity.py             # Entity, AggregateRoot
     │   │   ├── value_object.py       # ValueObject baza
-    │   │   ├── entity_id.py          # EntityId[T], PublicId (UUIDv7)
+    │   │   ├── entity_id.py          # EntityId[T], PublicId (UUID v4)
     │   │   ├── events.py             # DomainEvent baza
     │   │   └── errors.py             # DomainError, NotFoundError, ConflictError
     │   ├── application/

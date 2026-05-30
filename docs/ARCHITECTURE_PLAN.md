@@ -26,7 +26,7 @@
 | ADR-10 | **HPA** (Horizontal Pod Autoscaler) na `backend` deployment            | Pokazuje, że aplikacja jest stateless w warstwie HTTP (z wyjątkiem WS) i skaluje się poziomo. |
 | ADR-11 | **RBAC + ACL**: rola = bundle uprawnień; opcjonalny per-user override | Rozwiązuje wymóg "jeden admin może mieć inne uprawnienia niż inny". |
 | ADR-12 | **Język w kodzie: angielski** (nazwy, komentarze). Dokumentacja `docs/` po polsku. | Wymóg użytkownika. Łatwiej będzie podlinkować repo do CV. |
-| ADR-13 | **UUID v7** jako klucze publiczne (`PublicId`), `bigserial` jako PK wewnętrzny | UUID v7 jest sortowalny czasowo. Schowanie sequence ID w API ma walor bezpieczeństwa. |
+| ADR-13 | **UUID v4** jako klucze publiczne (`PublicId`), `bigserial` jako PK wewnętrzny | Schowanie sequence ID w API ma walor bezpieczeństwa. Sortowanie po `(created_at, public_id)` zamiast UUID v7. |
 | ADR-14 | **Pliki na dysku** (PVC ReadWriteMany w k8s), metadane w DB           | Wymóg użytkownika. Jeden generyczny endpoint `/api/files/*` służy do wszystkiego (avatar / post / comment / attachment). |
 
 ---
@@ -206,7 +206,7 @@ Pełny opis: `docs/04-infrastructure.md`.
   *w prawdziwym klastrze podmienić na ReadWriteMany (NFS / EFS / Azure Files)*.
 - **NetworkPolicy:** backend → postgres tylko z odpowiednim label selectorem.
 - **Probes:** liveness, readiness, **startup** (Alembic upgrade head trwa kilka sekund).
-- **Init container:** `alembic upgrade head` przed startem aplikacji.
+- **Migration Job:** `alembic upgrade head` jako Kubernetes Job przed startem aplikacji (nie init-container — unikamy race condition przy `replicas>1`).
 
 ---
 
@@ -230,10 +230,10 @@ nie dotrze do klienta WS spiętego z repliką B. W dokumentacji opisujemy to jak
 **Tabela `refresh_tokens` + cache wewnątrz pojedynczej repliki** — niespójności brak, bo
 każdy refresh idzie do DB. Wylogowanie userów = SQL UPDATE.
 
-**Migracje** — `alembic upgrade head` w init-container. K8s gwarantuje, że tylko jeden init
-container działa naraz w obrębie poda; przy `replicas: N` mamy race condition. Rozwiązanie:
-**Job migracji** uruchamiany przed rollout (`helm hook pre-install,pre-upgrade` lub
-`kubectl apply` ręcznie). Patrz `docs/04-infrastructure.md`.
+**Migracje** — `alembic upgrade head` jako **Kubernetes Job** uruchamiany przed rollout
+(`kubectl apply` ręcznie lub `helm hook pre-install,pre-upgrade`).
+Job gwarantuje, że migracja zakończy się zanim pody aplikacji wystartują,
+eliminując race condition przy `replicas: N`. Patrz `docs/04-infrastructure.md`.
 
 ---
 

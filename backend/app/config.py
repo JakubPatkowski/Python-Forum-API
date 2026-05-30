@@ -22,8 +22,13 @@ class Settings(BaseSettings):
     APP_NAME: str = "Forum Wędkarskie API"
     DEBUG: bool = False
 
-    # CORS — w produkcji ogranicz do konkretnego origin frontu
-    CORS_ALLOW_ORIGINS: list[str] = ["*"]
+    # CORS — jawne originy wymagane przy allow_credentials=True
+    # (wildcard "*" + credentials jest odrzucany przez przeglądarki).
+    CORS_ALLOW_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://forum.local",
+    ]
 
     # Komentarze
     MAX_COMMENT_DEPTH: int = 5

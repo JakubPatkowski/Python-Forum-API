@@ -31,8 +31,15 @@ def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
-    """Dekoduje token JWT, rzuca JWTError gdy niepoprawny / wygasły."""
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    """Dekoduje token JWT, rzuca JWTError gdy niepoprawny / wygasły.
+
+    Weryfikuje że token jest typu ``access`` — odrzuca refresh tokeny
+    (audit bug #6).
+    """
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    if payload.get("type") != "access":
+        raise JWTError("Expected access token, got different type")
+    return payload
 
 
 # Re-export, żeby moduły wyżej mogły łapać wyjątek bez importu jose
