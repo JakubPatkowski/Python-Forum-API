@@ -14,6 +14,24 @@ from app.shared.application.event_bus import IEventBus
 from app.shared.infrastructure.db import SessionLocal
 from app.shared.infrastructure.eventbus import InMemoryEventBus
 
+from app.modules.content.application.ports import IContentUnitOfWork
+from app.modules.content.application.use_cases import (
+    AddCommentUseCase,
+    CreateCategoryUseCase,
+    CreatePostUseCase,
+    CreateTagUseCase,
+    DeleteCategoryUseCase,
+    DeleteCommentUseCase,
+    DeletePostUseCase,
+    GetCommentTreeUseCase,
+    GetPostUseCase,
+    ListCategoriesUseCase,
+    ListPostsUseCase,
+    ListTagsUseCase,
+    UpdateCommentUseCase,
+    UpdatePostUseCase,
+)
+from app.modules.content.infrastructure import SqlAlchemyContentUnitOfWork
 from app.modules.identity.application.ports import (
     IIdentityUnitOfWork,
     IPasswordHasher,
@@ -69,6 +87,11 @@ def get_token_service() -> ITokenService:
 def get_identity_uow() -> IIdentityUnitOfWork:
     """A fresh UoW per FastAPI request. Caller must ``async with`` it."""
     return SqlAlchemyIdentityUnitOfWork(SessionLocal)
+
+
+def get_content_uow() -> IContentUnitOfWork:
+    """A fresh content UoW per FastAPI request."""
+    return SqlAlchemyContentUnitOfWork(SessionLocal)
 
 
 # --------------------------------------------------------------------------- #
@@ -131,3 +154,64 @@ def get_deny_permission_uc() -> DenyPermissionUseCase:
 
 def get_set_user_status_uc() -> SetUserStatusUseCase:
     return SetUserStatusUseCase(uow=get_identity_uow(), bus=get_event_bus())
+
+
+# --------------------------------------------------------------------------- #
+# Content module use cases                                                    #
+# --------------------------------------------------------------------------- #
+
+
+def get_create_post_uc() -> CreatePostUseCase:
+    return CreatePostUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_update_post_uc() -> UpdatePostUseCase:
+    return UpdatePostUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_delete_post_uc() -> DeletePostUseCase:
+    return DeletePostUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_get_post_uc() -> GetPostUseCase:
+    return GetPostUseCase(uow=get_content_uow())
+
+
+def get_list_posts_uc() -> ListPostsUseCase:
+    return ListPostsUseCase(uow=get_content_uow())
+
+
+def get_add_comment_uc() -> AddCommentUseCase:
+    return AddCommentUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_update_comment_uc() -> UpdateCommentUseCase:
+    return UpdateCommentUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_delete_comment_uc() -> DeleteCommentUseCase:
+    return DeleteCommentUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_comment_tree_uc() -> GetCommentTreeUseCase:
+    return GetCommentTreeUseCase(uow=get_content_uow())
+
+
+def get_create_category_uc() -> CreateCategoryUseCase:
+    return CreateCategoryUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_delete_category_uc() -> DeleteCategoryUseCase:
+    return DeleteCategoryUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_list_categories_uc() -> ListCategoriesUseCase:
+    return ListCategoriesUseCase(uow=get_content_uow())
+
+
+def get_create_tag_uc() -> CreateTagUseCase:
+    return CreateTagUseCase(uow=get_content_uow(), bus=get_event_bus())
+
+
+def get_list_tags_uc() -> ListTagsUseCase:
+    return ListTagsUseCase(uow=get_content_uow())

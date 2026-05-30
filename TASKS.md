@@ -1,7 +1,11 @@
 # Tasks
 
-> Plan v3 (Clean Architecture, modular monolith). Pełne szczegóły każdej fazy:
-> `docs/05-implementation-phases.md`. Każda faza ma gotowy prompt dla Opus 4.6.
+> Plan v3 (Clean Architecture, modular monolith). **Aktualny audyt + skorygowane, szczegółowe
+> instrukcje faz 3–9 + track frontendu: `docs/07-audyt-i-dalsze-instrukcje.md`** (nadpisuje
+> nieaktualne fragmenty `docs/05-implementation-phases.md`). Czytaj sekcję 5 (pułapki) przed każdą fazą.
+>
+> **Stan 2026-05-29:** Fazy 0, 1, 2 ✅ zaimplementowane. Naprawione w audycie: Alembic
+> `DuplicateTable` (guard w `0001`), `env.py` autogenerate (import content ORM). Następna: **Faza 3 (files)**.
 
 ## v3 — Roadmap (kolejność)
 
@@ -37,14 +41,16 @@
 
 ### Faza 2 — Moduł content (posts + comments z materialized path)
 
-- [ ] (v3-F2) Domain: `Post`, `Comment` (z `depth` + `path`), `Category`, `Tag`
-- [ ] (v3-F2) Walidacja `MAX_COMMENT_DEPTH` w domenie
-- [ ] (v3-F2) Application: porty + use case'y create/update/delete post & comment, manage_category/tag
-- [ ] (v3-F2) Infrastructure: ORM, repozytoria, mappery
-- [ ] (v3-F2) Presentation: routery `/api/v1/posts`, `/api/v1/comments`, `/api/v1/categories`, `/api/v1/tags`
-- [ ] (v3-F2) Migracje `0004_create_content_tables.py`, `0005_seed_categories.py`
-- [ ] (v3-F2) Soft delete dla komentarzy
-- [ ] (v3-F2) Testy: depth/path logic, listing drzewa DFS po `ORDER BY path`
+- [x] (v3-F2) Domain: `Post`, `Comment` (z `depth` + `path`), `Category`, `Tag`
+- [x] (v3-F2) Walidacja `MAX_COMMENT_DEPTH` (=5) w domenie
+- [x] (v3-F2) Application: porty + use case'y create/update/delete post & comment, manage_category/tag
+- [x] (v3-F2) Infrastructure: ORM (aliasy legacy + `tag_orm`), repozytoria, mappery, UoW z resolverem user UUID→id
+- [x] (v3-F2) Presentation: routery `/api/v1/posts`, `/api/v1/comments`, `/api/v1/categories`, `/api/v1/tags`
+- [x] (v3-F2) Migracje `0004_create_content_tables.py` (+ trigger FTS tsvector + backfill path CTE), `0005_seed_categories.py`
+- [x] (v3-F2) Soft delete dla komentarzy (`is_deleted`)
+- [x] (v3-F2) Testy unit: `test_comment_path.py`, `test_pagination.py`, `test_value_objects.py`
+- [x] (v3-F2) **DODANO**: keyset pagination + tsvector FTS (część fazy 6 zrobiona z wyprzedzeniem)
+- [ ] (v3-F2) Testy integracyjne content (post flow, comment tree DFS) — do uzupełnienia z testcontainers
 
 ### Faza 3 — Moduł files (generyczny upload)
 

@@ -33,6 +33,17 @@ def upgrade() -> None:
     # create_type=False i nie wywołuje _on_table_create po raz drugi.
     # Wzorzec identyczny jak w 0002_create_identity_tables.py.
     bind = op.get_bind()
+
+    # Idempotency guard — ten baseline odwzorowuje schemat, który dawniej budował
+    # wycofany hook `Base.metadata.create_all`. Jeśli baza pochodzi z tamtej epoki
+    # (albo z przerwanego wcześniej `upgrade`) i ma już tabele, ponowne CREATE TABLE
+    # rzuciłoby DuplicateTable ("relation 'users' already exists"). Wykrywamy ten
+    # przypadek i robimy no-op, dzięki czemu `alembic upgrade head` jedynie zapisuje
+    # rewizję 0001 (efekt równoważny `alembic stamp 0001`), a kolejne migracje
+    # 0002+ dograją brakujące kolumny i tabele. Na czystej bazie po prostu tworzymy.
+    if sa.inspect(bind).has_table("users"):
+        return
+
     postgresql.ENUM("user", "moderator", "admin", name="user_role").create(bind, checkfirst=True)
     postgresql.ENUM("plain", "markdown", name="content_format").create(bind, checkfirst=True)
 

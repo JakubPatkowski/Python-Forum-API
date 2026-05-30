@@ -40,8 +40,16 @@ services:
       # otherwise hide it under the host's empty directory.
       - backend_venv:/app/.venv
     # Apply migrations on every dev boot, then start uvicorn with reload.
+    # NOTE: bash -c (not -lc) — login shell sources /etc/profile which resets
+    # PATH and drops /app/.venv/bin, making alembic/uvicorn invisible.
     command: >
-      bash -lc "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      bash -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health/live\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       default:
         aliases:
@@ -55,7 +63,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   # ---------------------------------------------------------------------------
   # pgAdmin — DB browser for local development.

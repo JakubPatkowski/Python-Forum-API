@@ -78,15 +78,31 @@ def create_app() -> FastAPI:
         admin_users_router, prefix="/api/v1/admin/users", tags=["admin-users"]
     )
 
-    # Step 7b — legacy routers awaiting migration in phases 2-3.
-    # Auth & users were retired in phase 1; the rest still use the old
-    # ORM/services layer but accept phase-1 JWTs through `core/deps.py`.
-    from app.routers import admin, attachments, categories, comments, posts
+    # Step 7b — phase-2 content routers (modular monolith).
+    from app.modules.content.presentation import (
+        categories_router,
+        comments_router,
+        posts_router,
+        tags_router,
+    )
 
-    app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
-    app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
-    app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
-    app.include_router(attachments.router, prefix="/api/attachments", tags=["attachments"])
+    app.include_router(posts_router, prefix="/api/v1/posts", tags=["posts"])
+    app.include_router(
+        comments_router, prefix="/api/v1/comments", tags=["comments"]
+    )
+    app.include_router(
+        categories_router, prefix="/api/v1/categories", tags=["categories"]
+    )
+    app.include_router(tags_router, prefix="/api/v1/tags", tags=["tags"])
+
+    # Step 7c — legacy routers awaiting migration in phase 3.
+    # Posts, comments and categories were retired in phase 2.
+    # Attachments stays until phase 3 introduces the generic files module.
+    from app.routers import admin, attachments
+
+    app.include_router(
+        attachments.router, prefix="/api/attachments", tags=["attachments"]
+    )
 
     # Step 8 — admin SSR panel (excluded from OpenAPI schema).
     app.include_router(
