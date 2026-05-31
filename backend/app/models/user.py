@@ -15,8 +15,7 @@ class UserRole(str, Enum):
     """Hierarchia ról: ADMIN > MODERATOR > USER.
 
     Legacy enum — phase 1 introduces a proper RBAC (tables ``roles``,
-    ``role_permissions``, ``user_roles``). This column is kept until
-    legacy posts/comments/attachments routers are retired in phases 2-3.
+    ``role_permissions``, ``user_roles``). Kept until legacy routers retire.
     """
 
     USER = "user"
@@ -33,24 +32,17 @@ class UserStatus(str, Enum):
 
 
 class User(Base):
-    """``users`` table — single ORM mapping shared by legacy and phase-1 code.
-
-    Legacy columns (``hashed_password``, ``is_active``, ``role``) coexist with
-    phase-1 columns (``public_id``, ``password_hash``, ``status``,
-    ``avatar_file_id``, ``updated_at``). New registrations populate both
-    sets so legacy routers keep functioning until they're removed.
-    """
+    """``users`` table — single ORM mapping shared by legacy and phase-1 code."""
 
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    # Phase-1 public identifier — exposed in JWT ``sub`` and API URLs.
     public_id = Column(SQL_UUID(as_uuid=True), unique=True, nullable=True, index=True)
 
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
 
-    # --- legacy auth (phase 0) ---------------------------------------------
+    # --- legacy auth (phase 0) ---
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     role = Column(
@@ -61,12 +53,13 @@ class User(Base):
     )
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # --- phase-1 auth (Argon2 hash, status enum, avatar, updated_at) -------
+    # --- phase-1 auth (Argon2 hash, status enum, avatar, updated_at) ---
     password_hash = Column(String(255), nullable=True)
     status = Column(
         SAEnum(UserStatus, name="user_status", values_callable=lambda e: [m.value for m in e]),
         nullable=True,
     )
+    # avatar_file_id -> files.id (FK added in migration 0006, ON DELETE SET NULL).
     avatar_file_id = Column(BigInteger, nullable=True)
     updated_at = Column(
         DateTime(timezone=True),
@@ -77,13 +70,10 @@ class User(Base):
 
     posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
-    attachments = relationship(
-        "Attachment", back_populates="uploader", cascade="all, delete-orphan"
-    )
+    # Uploaded files live in the phase-3 ``files`` table (FK files.uploader_id).
 
     @property
     def is_admin(self) -> bool:
-        """Backward-compatible alias — niektóre routery sprawdzają is_admin."""
         return self.role == UserRole.ADMIN
 
     @property

@@ -1,0 +1,37 @@
+# Daily cleanup of orphaned (standalone, never-attached) files.
+# Deletes the DB rows and purges the objects + thumbnails from MinIO.
+#   kubectl apply -f k8s/backend/cleanup-cronjob.yaml
+# Trigger an ad-hoc run:
+#   kubectl create job --from=cronjob/files-cleanup files-cleanup-now -n forum-wedkarskie
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: files-cleanup
+  namespace: forum-wedkarskie
+spec:
+  schedule: "0 3 * * *"          # every day at 03:00
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: files-cleanup
+              image: forum-wedkarskie-backend:latest
+              imagePullPolicy: Never   # local minikube image
+              command: ["python", "-m", "app.maintenance.cleanup_orphan_files"]
+              envFrom:
+                - configMapRef:
+                    name: backend-config
+                - secretRef:
+                    name: minio-secret
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "250m"
+                  memory: "256Mi"

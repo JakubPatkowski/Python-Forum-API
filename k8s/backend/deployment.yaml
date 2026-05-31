@@ -23,6 +23,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: backend-config
+            # MINIO_ACCESS_KEY / MINIO_SECRET_KEY (and unused MINIO_ROOT_*).
+            - secretRef:
+                name: minio-secret
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads

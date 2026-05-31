@@ -307,6 +307,10 @@ Po zakończeniu update TASKS.md, memory/.
 
 **Cel.** Jeden zestaw endpointów dla wszystkich plików (avatary, embed, załączniki).
 
+**V1 (deprecated):** local-disk/PVC + streaming przez backend.
+
+**V2 (current):** MinIO + presigned PUT/GET + proxied fallback.
+
 ### Pliki
 
 ```
@@ -326,7 +330,8 @@ modules/files/
 │   ├── orm/
 │   ├── repositories/
 │   ├── storage/
-│   │   └── local_disk.py                        (IFileStorage impl)
+│   │   ├── minio_storage.py                     (IFileStorage impl)
+│   │   └── image_processing.py                  (python-magic + Pillow)
 │   └── mappers.py
 └── presentation/
     ├── routers/files.py                         (/api/v1/files/*)
@@ -335,17 +340,18 @@ modules/files/
 
 ### Migracje
 
-- `0006_create_files_table.py` — tabela `files` z polimorficznym ownership wg docs/02 sekcja 4.
+- `0006_create_files_table.py` — tabela `files` + FK `users.avatar_file_id`, drop legacy `attachments`.
 
 ### Kryteria gotowości
 
-- `POST /api/v1/files?owner_type=post&owner_id=UUID` (multipart) → 201 + metadata.
-- `POST /api/v1/files?owner_type=user_avatar` → upload, owner_user_id = current user, ustawia
-  `users.avatar_file_id`.
-- `GET /api/v1/files/{file_id}` → pobranie pliku (streaming).
-- `DELETE /api/v1/files/{file_id}` — uploader lub `file.delete.any`.
-- Walidacja MIME (python-magic), max size 10 MiB, generowanie storage_key z UUID.
-- Avatar usera → po zmianie odpinamy stary plik (event `FileDeleted`).
+- `POST /api/v1/files/uploads` → presigned PUT URL do MinIO.
+- `POST /api/v1/files/uploads/{id}/complete` → finalizacja (sniff, sha256, miniatury).
+- `POST /api/v1/files` → proxied fallback (multipart).
+- `POST /api/v1/posts/{post_id}/files` i `/comments/{comment_id}/files` → attach.
+- `POST /api/v1/users/me/avatar` → upload + ustawienie avataru (stary avatar usuwany).
+- `GET /api/v1/files/{id}` → metadata + presigned GET; `/content` robi redirect.
+- `DELETE /api/v1/files/{id}` — uploader lub `file.delete.any`.
+- Walidacja MIME (python-magic), max size, storage_key z UUID.
 
 ### Prompt startowy
 
@@ -357,12 +363,11 @@ Kontekst: Fazy 0-2 zakończone. identity i content działają.
 Zadania:
 1. Domain File AggregateRoot z metodami attach_to_post(), attach_to_comment(),
    attach_to_user_avatar(), detach().
-2. Application ports + use case'y upload/download/delete.
-   upload_file.py używa python-magic do MIME sniffing.
-3. Infrastructure: LocalDiskStorage zapisujący do settings.UPLOAD_DIR
-   (w k8s PVC). Streaming read/write żeby nie ładować pliku do RAM.
-4. Presentation: jeden generyczny endpoint /api/v1/files z parametrami query
-   owner_type i owner_id. Plus GET /api/v1/files/{id}, /info, DELETE.
+2. Application ports + use case'y request/complete/direct/attach/delete.
+   python-magic do MIME sniffing, Pillow do miniatur.
+3. Infrastructure: MinIO storage (presigned URLs) + image processing.
+4. Presentation: presigned flow (`/files/uploads` + `/complete`) i proxied fallback
+   (`/files`). Dodatkowo attach/list/redirect dla owners.
 5. Aktualizacja identity:
    - User.set_avatar(file_id) z eventem AvatarChanged.
    - Endpoint POST /api/v1/users/me/avatar wewnątrz identity wywołuje upload + set_avatar.
@@ -371,12 +376,12 @@ Zadania:
      są syntactic sugar nad /api/v1/files?owner_type=...&owner_id=... — implementacja
      przez delegację, nie duplikacja logiki.
    - W treści markdown wspieramy embed file:UUID.
-7. Migracja 0006.
+7. Migracja 0006 (files + FK avatar + drop attachments).
 8. Usuń stary moduł attachments i jego endpointy (DEAD CODE).
 9. Testy:
-   - unit/files/test_file_domain.py.
-   - integration/files/test_upload_flow.py — multipart upload, weryfikacja sha256,
-     download, MIME sniffing.
+    - unit/files/test_file_domain.py.
+    - integration/files/test_upload_flow.py — presigned + direct upload, sha256,
+       miniatury, redirect.
 
 Kryterium akceptacji: jednym endpointem obsługujemy avatar, post attachment,
 comment attachment. Lista z "Kryteria gotowości".

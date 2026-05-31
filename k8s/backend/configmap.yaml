@@ -11,5 +11,19 @@ data:
   SECRET_KEY: "change-me-via-secret"
   DEBUG: "false"
   UPLOAD_DIR: "/app/uploads"
-  MAX_UPLOAD_SIZE_BYTES: "10485760"
+  MAX_UPLOAD_SIZE_BYTES: "26214400"
   MAX_COMMENT_DEPTH: "5"
+  # --- MinIO -----------------------------------------------------------------
+  # In-cluster endpoint the backend uses for all server-side object ops.
+  MINIO_ENDPOINT: "minio-service:9000"
+  # Endpoint embedded in presigned URLs (must be reachable by the BROWSER).
+  # Replace <minikube-ip> with the output of `minikube ip` (NodePort 30900),
+  # or point it at an ingress host for MinIO.
+  MINIO_PUBLIC_ENDPOINT: "<minikube-ip>:30900"
+  MINIO_BUCKET: "forum-files"
+  MINIO_SECURE: "false"
+  FILE_DOWNLOAD_URL_TTL_SECONDS: "3600"
+  FILE_UPLOAD_URL_TTL_SECONDS: "900"
+  FILE_ORPHAN_RETENTION_HOURS: "24"
+  # MINIO_ACCESS_KEY / MINIO_SECRET_KEY come from the minio-secret (see
+  # k8s/backend/deployment.yaml envFrom).

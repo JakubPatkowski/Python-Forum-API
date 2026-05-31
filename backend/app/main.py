@@ -23,8 +23,11 @@ Alembic, run `alembic upgrade head` once and you are set.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -38,6 +41,24 @@ from app.shared.presentation.middleware import (
     SecurityHeadersMiddleware,
 )
 
+logger = structlog.get_logger(__name__)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Best-effort: ensure the MinIO bucket exists on boot.
+
+    In docker-compose / k8s a dedicated job creates the bucket; this is a
+    convenience for plain ``uvicorn`` dev runs. Failures are non-fatal.
+    """
+    try:
+        from app.container import get_file_storage
+
+        await get_file_storage().ensure_bucket()
+    except Exception:
+        logger.warning("minio_bucket_init_failed", exc_info=True)
+    yield
+
 
 def create_app() -> FastAPI:
     """Build and configure a FastAPI application instance."""
@@ -49,6 +70,7 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         description="Fishing forum API (modular monolith, Clean Architecture).",
         version="0.3.0",
+        lifespan=_lifespan,
     )
 
     # Step 3 — middleware (LIFO: last added = first executed).
@@ -108,14 +130,15 @@ def create_app() -> FastAPI:
     )
     app.include_router(tags_router, prefix="/api/v1/tags", tags=["tags"])
 
-    # Step 7c — legacy routers awaiting migration in phase 3.
-    # Posts, comments and categories were retired in phase 2.
-    # Attachments stays until phase 3 introduces the generic files module.
-    from app.routers import admin, attachments
+    # Step 7c — phase-3 files module (generic upload to MinIO). Mounted at
+    # /api/v1 because it also serves owner-scoped routes such as
+    # /api/v1/posts/{id}/files and /api/v1/users/me/avatar.
+    from app.modules.files.presentation import files_router
 
-    app.include_router(
-        attachments.router, prefix="/api/attachments", tags=["attachments"]
-    )
+    app.include_router(files_router, prefix="/api/v1", tags=["files"])
+
+    # Step 7d — legacy admin SSR panel (attachments router removed in phase 3).
+    from app.routers import admin
 
     # Step 8 — admin SSR panel (excluded from OpenAPI schema).
     app.include_router(

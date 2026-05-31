@@ -3,7 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.post import ContentFormat
-from app.schemas.attachment import AttachmentOut
 from app.schemas.user import UserOut
 
 
@@ -30,6 +29,5 @@ class PostOut(BaseModel):
     updated_at: datetime
     author: UserOut
     category_id: int | None
-    attachments: list[AttachmentOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

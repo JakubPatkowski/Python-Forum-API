@@ -9,6 +9,7 @@ deployments:
   - frontend            (replicas: 2,  image: forum-wedkarskie-frontend:latest)
   - backend             (replicas: 2,  HPA 2-6, image: forum-wedkarskie-backend:latest)
   - postgres            (replicas: 1,  PVC postgres-pvc 5Gi)
+  - minio               (replicas: 1,  PVC minio-pvc 5Gi)
   - rabbitmq            (replicas: 1,  PVC rabbitmq-pvc 2Gi, management UI :15672)
   - pgadmin             (replicas: 1)
 
@@ -19,6 +20,7 @@ services:
   - frontend-service           (ClusterIP :80)
   - backend-service            (ClusterIP :8000)
   - postgres-service           (ClusterIP :5432, headless)
+  - minio-service              (NodePort :9000 + :9001 console)
   - rabbitmq-service           (ClusterIP :5672 + :15672 management)
   - pgadmin-service            (ClusterIP :80, NodePort opcjonalnie)
 
@@ -31,14 +33,17 @@ ingress (NGINX):
 
 jobs:
   - backend-migrate           (alembic upgrade head)
+  - minio-create-bucket       (job tworzy bucket na starcie)
   - cleanup-refresh-tokens    (CronJob @daily)
+  - files-cleanup             (CronJob @daily)
 
 helm releases:
   - kube-prometheus-stack     (Prometheus + Grafana + AlertManager + node-exporter)
 
 config:
-  - backend-config (ConfigMap):  DATABASE_URL, RABBITMQ_URL, UPLOAD_DIR, app config
+  - backend-config (ConfigMap):  DATABASE_URL, RABBITMQ_URL, MINIO_* , app config
   - backend-secrets (Secret):    SECRET_KEY, DB password, RABBITMQ password
+  - minio-secret (Secret):       MINIO_ROOT_USER/PASSWORD + MINIO_ACCESS_KEY/SECRET_KEY
   - rabbitmq-secret (Secret):    erlang cookie, default user/password
   - postgres-secret (Secret):    POSTGRES_PASSWORD
 ```
@@ -73,6 +78,14 @@ k8s/
 │   ├── hpa.yaml
 │   ├── migration-job.yaml
 │   └── cleanup-cronjob.yaml
+│
+├── minio/
+│   ├── pvc.yaml
+│   ├── secret.example.yaml
+│   ├── secret.yaml
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── create-bucket-job.yaml
 │
 ├── frontend/
 │   ├── deployment.yaml

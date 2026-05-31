@@ -1,0 +1,23 @@
+# NodePort so the BROWSER can reach MinIO for presigned upload/download.
+# - Inside the cluster the backend uses  minio-service:9000  (ClusterIP).
+# - From the host the browser uses        <minikube ip>:30900  → set this as
+#   MINIO_PUBLIC_ENDPOINT in k8s/backend/configmap.yaml.
+#   Find the IP with:  minikube ip
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: forum-wedkarskie
+spec:
+  type: NodePort
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+      nodePort: 30900
+    - name: console
+      port: 9001
+      targetPort: 9001
+      nodePort: 30901

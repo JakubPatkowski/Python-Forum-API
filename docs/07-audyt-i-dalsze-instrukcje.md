@@ -23,10 +23,10 @@ legacy routery (`attachments`, `admin` SSR).
 | **0 — Bootstrap** | uv + `pyproject.toml` (ruff, mypy strict, pytest-asyncio), `shared/` (Entity, AggregateRoot, ValueObject, EntityId, DomainEvent, IRepository, IUnitOfWork, IEventBus, `Result`/`Ok`/`Err`, ApiResponse, error handler, structlog), `InMemoryEventBus`, Alembic (`env.py` czyta URL z settings, baseline `0001`), `create_app()` factory, Dockerfile multi-stage z `uv`, docker-compose, `migration-job.yaml`. | ✅ |
 | **1 — identity** | Domain: `User` AR (register/block/assign_role/grant_permission/deny_permission…), VO `Email`/`Username`/`RawPassword`, `Role`, `Permission`, `RefreshToken`. Application: porty (Protocols), commands, use case'y register/login/refresh/logout/logout_all/assign_role/revoke_role/grant_permission/deny_permission/set_user_status (każdy zwraca `Result`). Infra: `Argon2Hasher`, `PyJWTTokenService` (access+refresh, rotacja, **reuse-detection**), repozytoria, mappery, UoW. Presentation: `/api/v1/{auth,users,admin/users}`, `requires(*codes)`. Migracje `0002`/`0003`. Testy unit + szkielet integration. DI w `container.py`. | ✅ |
 | **2 — content** | Domain: `Post`, `Comment` (materialized `path` + `depth`), `Category`, `Tag`, VO `Slug`/`MarkdownContent`/`ContentFormat`. Application: create/update/delete post & comment, get_post, list_posts (keyset), comment_tree, kategorie, tagi, `pagination.py`. Infra: ORM (aliasy legacy + `tag_orm`), repozytoria, mappery, UoW z resolverem `user UUID → users.id`. Presentation: `/api/v1/{posts,comments,categories,tags}`. Migracje `0004` (kolumny content + `tags`/`post_tags` + **trigger FTS tsvector** + backfill `path` rekurencyjnym CTE) i `0005` (5 kategorii). Testy unit (path, pagination, VO). | ✅ kod gotowy — **ale niezaznaczone** w `TASKS.md`/`README.md` |
+| **3 — files** | Generyczny moduł plikow: MinIO + presigned URLs, warianty miniatur, czyszczenie sierot. Domain `File`, application use case'y (request/complete/direct/attach/delete/get/list), infra (MinIO + Pillow + repo + UoW), presentation `/api/v1/files` + sugar dla post/comment/avatar/category, CronJob cleanup. Migracja `0006` + drop legacy `attachments`. | ✅ |
 
 ### Czego BRAKUJE (tylko szkielet `__init__.py` lub nic)
 
-- **Faza 3 — files**: puste pakiety `modules/files/*`. Upload nadal realizuje **legacy** `routers/attachments.py`.
 - **Faza 4 — RabbitMQ + notifications + audit**: puste pakiety; w użyciu `InMemoryEventBus` (eventy gubione). `aio-pika` jest w zależnościach, niewpięte.
 - **Faza 5 — WebSocket**: pusty `modules/notifications/presentation/ws/`.
 - **Faza 6 — widoki DB + FTS + keyset**: keyset i tsvector częściowo zrobione już w fazie 2; **widoki SQL nie istnieją**.
@@ -85,7 +85,7 @@ Te punkty **nadpisują** treść z `docs/05-implementation-phases.md` / `ARCHITE
 
 1. **Faza 0 / kryterium „alembic upgrade head na bazie z create_all"** — to właśnie źródło błędu #1. Nowa reguła: **dev startuje z czystego wolumenu** (`down -v`), a `0001` ma guard. Nie zakładać „pustej migracji baseline".
 2. **Faza 2**: `MAX_COMMENT_DEPTH` = **5** (nie 8). Path: zero-padded `lpad(id,8,'0')` segmenty łączone `.` — zgodnie z `0004`.
-3. **Faza 3**: dopisać krok **migracji ID** — nowy `files` adresuje właścicieli przez **UUID** (`post.public_id`, `comment.public_id`, `user.public_id`), nie przez int. Stare `attachments` (int) + dane → zmigrować lub porzucić. `users.avatar_file_id` (BigInt) ma dostać FK do `files.id` dopiero gdy tabela `files` istnieje.
+3. **Faza 3**: **V1 (deprecated)** zakładał local-disk/PVC. **V2 (current)** używa MinIO + presigned URLs; `attachments` jest dropnięte bez backfill (brak danych). `users.avatar_file_id` ma FK do `files.id`.
 4. **Faza 4 vs 5 (WebSocket + worker)**: doprecyzowane — worker (consumer RabbitMQ) **nie trzyma** połączeń WS (te żyją w podach backendu). Mechanizm fan-out do WS: osobny event `notifications.NotificationCreated` z **per-pod exclusive/autoDelete queue**. W „prostej wersji" MVP: broadcast in-process w podzie backendu (akceptowalny trade-off, opisać w sprawozdaniu).
 5. **ADR-13 (UUID v7)** vs kod (v4) — patrz #7. Zdecydować i ujednolicić.
 6. **ARCHITECTURE_PLAN §7** — usunąć „init container", zostaje **Job** (§8).
@@ -121,32 +121,37 @@ Te punkty **nadpisują** treść z `docs/05-implementation-phases.md` / `ARCHITE
 > Pełny kontekst architektoniczny dalej w `docs/01–04`; tu są poprawki i konkrety wykonawcze.
 > Kolejność rekomendowana: **F3 → F-Front (MVP) → F4 → F5 → F7 → F6 → F8 → F9**, z D1 podjętą przed F4.
 
-### Faza 3 — moduł `files` (generyczny upload) — **następna**
+### Faza 3 — moduł `files` (generyczny upload) — **zrobiona**
 
-**Cel.** Jeden zestaw endpointów `/api/v1/files` dla avatarów, załączników postów i komentarzy; metadane w DB, bajty na dysku (PVC). Usunięcie legacy `attachments`.
+**Cel.** Jeden zestaw endpointów `/api/v1/files` dla avatarów, załączników postów i komentarzy; metadane w DB, bajty w MinIO (presigned URLs). Usunięcie legacy `attachments`.
+
+**V1 (deprecated).** Local-disk/PVC + streaming z backendu.
+
+**V2 (current).** MinIO + presigned PUT/GET, warianty miniatur, cleanup sierot.
 
 **Pliki:**
 ```
 modules/files/
   domain/        file.py (File AR), value_objects.py (StorageKey, Sha256, MimeType, ByteSize), events.py (FileUploaded, FileDeleted)
   application/   ports.py (IFileRepository, IFileStorage, IFilesUnitOfWork), commands.py, use_cases/{upload_file,download_file,delete_file,get_file_info}.py
-  infrastructure/ orm/file_orm.py, repositories/file_repo.py, storage/local_disk.py, mappers.py, unit_of_work.py
+  infrastructure/ orm/file_orm.py, repositories/file_repo.py, storage/minio_storage.py, storage/image_processing.py, mappers.py, unit_of_work.py
   presentation/  routers/files.py, dto/file_dto.py
 ```
 
 **Kroki:**
-1. Domain `File` AR: pola `id(UUID)`, `uploader_id(UserId)`, `storage_key`, `original_name`, `content_type`, `size_bytes`, `sha256`, `owner_type∈{post,comment,user_avatar}`, `owner_id(UUID|None)`. Metody `attach_to(owner_type, owner_id)`, `detach()`. VO: `MimeType` (whitelist z `settings.ALLOWED_MIME_TYPES`), `ByteSize` (≤ `MAX_UPLOAD_SIZE_BYTES`), `Sha256`.
-2. `IFileStorage` (port): `save(stream)->StorageKey`, `open_for_read(key)->IO`, `delete(key)`. Impl `LocalDiskStorage` — **streaming** (chunki, bez ładowania do RAM), nazwa = `f"{uuid4().hex}{ext}"`, podkatalogi `aa/bb/` z prefiksu sha256 (uniknięcie wielkich katalogów).
-3. MIME sniffing `python-magic` z faktycznej zawartości (nie ufaj `content_type` z klienta); walidacja po sniffingu → 415 przy złym typie.
-4. Use case `upload_file`: oblicz sha256 podczas streamingu; dedup opcjonalny (ten sam sha256 + uploader → zwróć istniejący). Sprawdź uprawnienia: `file.upload`; dla `owner_type=post` zweryfikuj że post istnieje (przez port do content lub event) i że actor=autor lub `post.update.any`.
-5. Presentation: `POST /api/v1/files?owner_type=&owner_id=` (multipart), `GET /api/v1/files/{id}` (StreamingResponse + RFC 5987), `GET /api/v1/files/{id}/info`, `DELETE /api/v1/files/{id}` (uploader lub `file.delete.any`). „Cukier": `POST /api/v1/posts/{post_id}/files` deleguje do generyka (bez duplikacji logiki).
-6. Integracja identity: `User.set_avatar(file_id)` (jest) + `POST /api/v1/users/me/avatar` (upload→set_avatar→event `AvatarChanged`; odepnij stary plik). Dodaj FK `users.avatar_file_id → files.id` w migracji.
-7. **Usuń legacy**: `routers/attachments.py`, `services/attachment_service.py`, `services/storage_service.py`, `models/attachment.py`, `schemas/attachment.py`; zdejmij include w `main.py`; usuń z ruff/mypy `extend-exclude`. Admin SSR `attachments.html` — podmień na listę z `files` albo usuń stronę.
-8. **`alembic/env.py`**: dodaj `import app.modules.files.infrastructure.orm` (patrz pułapka #3).
+1. Domain `File` AR: pola `id(UUID)`, `uploader_id(UserId)`, `storage_key`, `original_name`, `content_type`, `size_bytes`, `sha256`, `owner_type∈{post,comment,user_avatar,category,standalone}`, `owner_id(UUID|None)`. Metody `attach_to(owner_type, owner_id)`, `detach()`. VO: `MimeType` (whitelist), `ByteSize` (≤ `MAX_UPLOAD_SIZE_BYTES`), `Sha256`.
+2. `IFileStorage` (port): presigned PUT/GET + server-side put/get/stat/remove. Impl `MinioFileStorage` (presigned host = `MINIO_PUBLIC_ENDPOINT`).
+3. MIME sniffing `python-magic`; walidacja po sniffingu → 415 przy złym typie. Dla obrazow: generowanie wariantow miniatur (Pillow).
+4. Presigned flow: `POST /files/uploads` -> PUT do MinIO -> `POST /files/uploads/{id}/complete` (sniff, sha256, thumbnails).
+5. Proxied fallback: `POST /files` (multipart) dla avatarow/testow.
+6. Attach endpoints: `POST /posts/{id}/files`, `POST /comments/{id}/files`, `POST /users/me/avatar`, `POST /categories/{id}/image` + publiczne listy/redirecty.
+7. Cleanup sierot: CLI + CronJob (retencja `FILE_ORPHAN_RETENTION_HOURS`).
+8. **Usuń legacy**: `routers/attachments.py`, `services/attachment_service.py`, `services/storage_service.py`, `models/attachment.py`, `schemas/attachment.py`; zdejmij include w `main.py`.
+9. **`alembic/env.py`**: import ORM files.
 
-**Migracje:** `0006_create_files_table.py` — `files` (UUID public_id unique, sha256 index, `owner_type` enum, `owner_id` UUID, XOR/`CHECK` na ownership), backfill ze starych `attachments` (mapuj `post_id→post.public_id`) **albo** świadomie porzuć stare dane (dev). Dodaj FK `users.avatar_file_id`.
+**Migracje:** `0006_create_files_table.py` — `files` + FK `users.avatar_file_id`; legacy `attachments` drop bez backfill (brak danych).
 
-**Kryteria odbioru:** jeden endpoint obsługuje avatar + załącznik posta + komentarza; sniffing MIME → 415 dla złych typów; `GET` streamuje; `DELETE` respektuje własność; sha256 liczone; brak importów `app.routers.attachments` w całym repo (`grep`).
+**Kryteria odbioru:** presigned flow dziala end-to-end; `GET` redirectuje do MinIO; `DELETE` respektuje własność; sha256 liczone; brak importów `app.routers.attachments` w całym repo (`grep`).
 
 **Pułapki:** ID po UUID (nie int) — błąd #4; `python-magic` na Windows wymaga `python-magic-bin` (jest w deps warunkowo); guard #3 w `env.py`.
 
