@@ -54,11 +54,7 @@ class Post(Base):
     comments = relationship(
         "Comment", back_populates="post", cascade="all, delete-orphan"
     )
-    attachments = relationship(
-        "Attachment",
-        back_populates="post",
-        cascade="all, delete-orphan",
-        foreign_keys="Attachment.post_id",
-    )
+    # Attachments live in the phase-3 ``files`` module (table ``files``);
+    # the legacy ``attachments`` relationship was removed.
     # tag_links — phase-2 (model PostTag jeszcze nie istnieje)
     # tag_links = relationship("PostTag", back_populates="post", cascade="all, delete-orphan")

@@ -11,10 +11,8 @@ from logging.config import fileConfig
 
 import app.models  # noqa: F401 - side-effect import registers legacy ORM mappers
 import app.modules.content.infrastructure.orm  # noqa: F401 - phase-2 mappers (tags, post_tags)
+import app.modules.files.infrastructure.orm  # noqa: F401 - phase-3 mappers (files)
 import app.modules.identity.infrastructure.orm  # noqa: F401 - phase-1 mappers
-# NOTE: when the files module (phase 3) introduces its own tables, add
-#   import app.modules.files.infrastructure.orm  # noqa: F401
-# here too — otherwise autogenerate will not see them and may emit a DROP.
 from alembic import context
 from app.config import settings
 from app.shared.infrastructure.db import Base

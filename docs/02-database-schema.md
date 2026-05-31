@@ -227,49 +227,50 @@ CREATE INDEX idx_comments_parent ON comments (parent_id);
 
 ## 4. Schemat — moduł `files`
 
+**V1 (deprecated):** local-disk/PVC. **V2 (current):** MinIO + presigned URLs (bytes poza DB).
+
 ```sql
-CREATE TYPE file_owner_type AS ENUM ('user_avatar', 'post', 'comment', 'standalone');
+CREATE TYPE file_owner_type AS ENUM ('standalone', 'post', 'comment', 'user_avatar', 'category');
+CREATE TYPE file_status AS ENUM ('pending', 'ready');
 
 CREATE TABLE files (
     id              bigserial PRIMARY KEY,
     public_id       uuid NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    uploader_id     bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    storage_key     varchar(255) NOT NULL UNIQUE,    -- nazwa pliku na dysku (uuid + ext)
+    uploader_id     integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    storage_key     varchar(255) NOT NULL UNIQUE,    -- klucz obiektu w MinIO
     original_name   varchar(255) NOT NULL,
-    content_type    varchar(100) NOT NULL,
-    size_bytes      bigint NOT NULL CHECK (size_bytes > 0),
-    sha256          char(64) NOT NULL,
+    content_type    varchar(150) NOT NULL,
+    size_bytes      bigint NOT NULL DEFAULT 0,
+    sha256          char(64) NULL,
+    status          file_status NOT NULL DEFAULT 'pending',
     owner_type      file_owner_type NOT NULL DEFAULT 'standalone',
-    owner_post_id   bigint NULL REFERENCES posts(id)    ON DELETE CASCADE,
-    owner_comment_id bigint NULL REFERENCES comments(id) ON DELETE CASCADE,
-    owner_user_id   bigint NULL REFERENCES users(id)    ON DELETE CASCADE,
+    owner_post_id   integer NULL REFERENCES posts(id)     ON DELETE CASCADE,
+    owner_comment_id integer NULL REFERENCES comments(id) ON DELETE CASCADE,
+    owner_user_id   integer NULL REFERENCES users(id)     ON DELETE CASCADE,
+    owner_category_id integer NULL REFERENCES categories(id) ON DELETE CASCADE,
+    width           integer NULL,
+    height          integer NULL,
+    variants        jsonb NULL,
     created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
 
-    -- XOR ownership: dokładnie 0 lub 1 owner_X_id w zależności od owner_type
+    -- XOR ownership: maks. jeden owner_X_id
     CONSTRAINT files_owner_check CHECK (
-        (CASE WHEN owner_post_id    IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN owner_comment_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN owner_user_id    IS NOT NULL THEN 1 ELSE 0 END)
+        (CASE WHEN owner_post_id     IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN owner_comment_id  IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN owner_user_id     IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN owner_category_id IS NOT NULL THEN 1 ELSE 0 END)
         <= 1
-    ),
-    CONSTRAINT files_owner_type_match CHECK (
-        (owner_type = 'post'        AND owner_post_id    IS NOT NULL) OR
-        (owner_type = 'comment'     AND owner_comment_id IS NOT NULL) OR
-        (owner_type = 'user_avatar' AND owner_user_id    IS NOT NULL) OR
-        (owner_type = 'standalone'  AND owner_post_id IS NULL
-                                    AND owner_comment_id IS NULL
-                                    AND owner_user_id IS NULL)
     )
 );
-CREATE INDEX idx_files_owner_post    ON files (owner_post_id)    WHERE owner_post_id    IS NOT NULL;
-CREATE INDEX idx_files_owner_comment ON files (owner_comment_id) WHERE owner_comment_id IS NOT NULL;
-CREATE INDEX idx_files_owner_user    ON files (owner_user_id)    WHERE owner_user_id    IS NOT NULL;
-CREATE INDEX idx_files_sha256        ON files (sha256);  -- deduplication / lookup
+CREATE INDEX idx_files_owner_post    ON files (owner_post_id)     WHERE owner_post_id    IS NOT NULL;
+CREATE INDEX idx_files_owner_comment ON files (owner_comment_id)  WHERE owner_comment_id IS NOT NULL;
+CREATE INDEX idx_files_owner_user    ON files (owner_user_id)     WHERE owner_user_id    IS NOT NULL;
+CREATE INDEX idx_files_owner_category ON files (owner_category_id) WHERE owner_category_id IS NOT NULL;
+CREATE INDEX idx_files_sha256        ON files (sha256);
 ```
 
-**Dedup po `sha256`:** opcjonalne — endpoint upload może wykryć duplikat i zwrócić istniejący `File`
-z owner == nowy owner (czyli plik fizycznie jeden, metadane wiele). Decyzja: **nie w MVP** —
-prościej trzymać jeden rekord per upload. Dedup może być fazą 6.
+**Dedup po `sha256`:** opcjonalne. W MVP kazdy upload to osobny rekord.
 
 ---
 

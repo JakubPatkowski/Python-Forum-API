@@ -10,10 +10,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.infrastructure.db import SessionLocal
-from app.shared.infrastructure.eventbus import InMemoryEventBus
-
 from app.modules.content.application.ports import IContentUnitOfWork
 from app.modules.content.application.use_cases import (
     AddCommentUseCase,
@@ -32,6 +28,31 @@ from app.modules.content.application.use_cases import (
     UpdatePostUseCase,
 )
 from app.modules.content.infrastructure import SqlAlchemyContentUnitOfWork
+from app.modules.files.application.ports import (
+    IFileProcessor,
+    IFileStorage,
+    IFilesUnitOfWork,
+)
+from app.modules.files.application.use_cases import (
+    AttachFilesUseCase,
+    CleanupOrphansUseCase,
+    CompleteUploadUseCase,
+    DeleteFileUseCase,
+    DirectUploadUseCase,
+    GetAvatarUseCase,
+    GetCategoryImageUseCase,
+    GetFileUseCase,
+    ListMyFilesUseCase,
+    ListOwnerFilesUseCase,
+    RequestUploadUseCase,
+    SetAvatarUseCase,
+    SetCategoryImageUseCase,
+)
+from app.modules.files.infrastructure import (
+    MinioFileStorage,
+    PillowFileProcessor,
+    SqlAlchemyFilesUnitOfWork,
+)
 from app.modules.identity.application.ports import (
     IIdentityUnitOfWork,
     IPasswordHasher,
@@ -56,7 +77,9 @@ from app.modules.identity.infrastructure.auth import (
 from app.modules.identity.infrastructure.unit_of_work import (
     SqlAlchemyIdentityUnitOfWork,
 )
-
+from app.shared.application.event_bus import IEventBus
+from app.shared.infrastructure.db import SessionLocal
+from app.shared.infrastructure.eventbus import InMemoryEventBus
 
 # --------------------------------------------------------------------------- #
 # Singletons                                                                  #
@@ -215,3 +238,103 @@ def get_create_tag_uc() -> CreateTagUseCase:
 
 def get_list_tags_uc() -> ListTagsUseCase:
     return ListTagsUseCase(uow=get_content_uow())
+
+
+# --------------------------------------------------------------------------- #
+# Files module — storage singletons, UoW, use cases                           #
+# --------------------------------------------------------------------------- #
+
+
+@lru_cache
+def get_file_storage() -> IFileStorage:
+    """MinIO client wrapper (singleton — holds connection pools)."""
+    return MinioFileStorage()
+
+
+@lru_cache
+def get_file_processor() -> IFileProcessor:
+    """libmagic + Pillow content processor (stateless singleton)."""
+    return PillowFileProcessor()
+
+
+def get_files_uow() -> IFilesUnitOfWork:
+    """A fresh files UoW per FastAPI request."""
+    return SqlAlchemyFilesUnitOfWork(SessionLocal)
+
+
+def get_request_upload_uc() -> RequestUploadUseCase:
+    return RequestUploadUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_complete_upload_uc() -> CompleteUploadUseCase:
+    return CompleteUploadUseCase(
+        uow=get_files_uow(),
+        storage=get_file_storage(),
+        processor=get_file_processor(),
+        bus=get_event_bus(),
+    )
+
+
+def get_direct_upload_uc() -> DirectUploadUseCase:
+    return DirectUploadUseCase(
+        uow=get_files_uow(),
+        storage=get_file_storage(),
+        processor=get_file_processor(),
+        bus=get_event_bus(),
+    )
+
+
+def get_get_file_uc() -> GetFileUseCase:
+    return GetFileUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_list_my_files_uc() -> ListMyFilesUseCase:
+    return ListMyFilesUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_list_owner_files_uc() -> ListOwnerFilesUseCase:
+    return ListOwnerFilesUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_attach_files_uc() -> AttachFilesUseCase:
+    return AttachFilesUseCase(
+        uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus()
+    )
+
+
+def get_delete_file_uc() -> DeleteFileUseCase:
+    return DeleteFileUseCase(
+        uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus()
+    )
+
+
+def get_set_avatar_uc() -> SetAvatarUseCase:
+    return SetAvatarUseCase(
+        uow=get_files_uow(),
+        storage=get_file_storage(),
+        processor=get_file_processor(),
+        bus=get_event_bus(),
+    )
+
+
+def get_set_category_image_uc() -> SetCategoryImageUseCase:
+    return SetCategoryImageUseCase(
+        uow=get_files_uow(),
+        storage=get_file_storage(),
+        processor=get_file_processor(),
+        bus=get_event_bus(),
+    )
+
+
+def get_get_avatar_uc() -> GetAvatarUseCase:
+    return GetAvatarUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_get_category_image_uc() -> GetCategoryImageUseCase:
+    return GetCategoryImageUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_cleanup_orphans_uc() -> CleanupOrphansUseCase:
+    return CleanupOrphansUseCase(
+        uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus()
+    )

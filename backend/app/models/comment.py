@@ -67,10 +67,5 @@ class Comment(Base):
         cascade="all, delete-orphan",
         order_by="Comment.created_at",
     )
-
-    attachments = relationship(
-        "Attachment",
-        back_populates="comment",
-        cascade="all, delete-orphan",
-        foreign_keys="Attachment.comment_id",
-    )
+    # Attachments live in the phase-3 ``files`` module (table ``files``);
+    # the legacy ``attachments`` relationship was removed.

@@ -5,7 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.post import ContentFormat
-from app.schemas.attachment import AttachmentOut
 from app.schemas.user import UserOut
 
 
@@ -32,7 +31,6 @@ class CommentOut(BaseModel):
     post_id: int
     parent_id: int | None
     depth: int
-    attachments: list[AttachmentOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

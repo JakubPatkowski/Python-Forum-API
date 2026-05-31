@@ -14,7 +14,6 @@ from app.config import settings
 from app.core.deps import get_admin_from_cookie
 from app.core.security import create_access_token, verify_password
 from app.database import get_db
-from app.models.attachment import Attachment
 from app.models.comment import Comment
 from app.models.post import Post
 from app.models.user import User, UserRole
@@ -86,7 +85,6 @@ def dashboard(
         "users": db.query(User).count(),
         "posts": db.query(Post).count(),
         "comments": db.query(Comment).count(),
-        "attachments": db.query(Attachment).count(),
     }
     return templates.TemplateResponse(
         request, "admin/dashboard.html", {"admin": admin, "stats": stats}
@@ -203,14 +201,4 @@ def delete_comment_admin(
     return RedirectResponse(url="/admin/comments", status_code=status.HTTP_303_SEE_OTHER)
 
 
-# GET /admin/attachments
-@router.get("/attachments", response_class=HTMLResponse)
-def list_attachments_admin(
-    request: Request,
-    admin: Annotated[User, Depends(get_admin_from_cookie)],
-    db: Annotated[Session, Depends(get_db)],
-) -> HTMLResponse:
-    attachments = db.query(Attachment).order_by(Attachment.created_at.desc()).limit(200).all()
-    return templates.TemplateResponse(
-        request, "admin/attachments.html", {"admin": admin, "attachments": attachments}
-    )
+# Attachments admin view removed in phase 3 (legacy attachments → files module).

@@ -27,7 +27,7 @@
 | ADR-11 | **RBAC + ACL**: rola = bundle uprawnień; opcjonalny per-user override | Rozwiązuje wymóg "jeden admin może mieć inne uprawnienia niż inny". |
 | ADR-12 | **Język w kodzie: angielski** (nazwy, komentarze). Dokumentacja `docs/` po polsku. | Wymóg użytkownika. Łatwiej będzie podlinkować repo do CV. |
 | ADR-13 | **UUID v4** jako klucze publiczne (`PublicId`), `bigserial` jako PK wewnętrzny | Schowanie sequence ID w API ma walor bezpieczeństwa. Sortowanie po `(created_at, public_id)` zamiast UUID v7. |
-| ADR-14 | **Pliki na dysku** (PVC ReadWriteMany w k8s), metadane w DB           | Wymóg użytkownika. Jeden generyczny endpoint `/api/files/*` służy do wszystkiego (avatar / post / comment / attachment). |
+| ADR-14 | **MinIO (S3) + presigned URLs**, metadane w DB                        | Jeden generyczny endpoint `/api/v1/files/*` do wszystkiego (avatar / post / comment / category). Bajty poza backendem. |
 
 ---
 
@@ -83,7 +83,7 @@
                      │
                      ▼
               ┌─────────────┐
-              │ PVC uploads │  (ReadWriteMany)
+              │   MinIO     │  (S3 storage)
               └─────────────┘
 
          Prometheus  scrape  ─►  backend /metrics   ──► Grafana dashboards
@@ -100,7 +100,7 @@ Pełny opis: `docs/01-clean-architecture.md`.
    - Encje: `User`, `Post`, `Comment`, `Category`, `Tag`, `File`, `Role`, `Permission`.
 2. **Application** — use cases (np. `CreatePostUseCase`), porty (interfejsy repozytoriów, event busa).
    - `IRepository[T]`, `IUnitOfWork`, `IEventBus`, `IFileStorage`, `IPasswordHasher`, `ITokenService`.
-3. **Infrastructure** — implementacje portów: SQLAlchemy, RabbitMQ, lokalny disk storage, Argon2, PyJWT.
+3. **Infrastructure** — implementacje portów: SQLAlchemy, RabbitMQ, MinIO storage, Argon2, PyJWT.
 4. **Presentation** — FastAPI routers, Pydantic DTO, dependency injection, mapery domain ↔ DTO.
 
 **Reguła zależności:** strzałka tylko do środka. Domain ← Application ← Infrastructure / Presentation.
@@ -196,14 +196,14 @@ Pełny opis: `docs/03-security.md`.
 Pełny opis: `docs/04-infrastructure.md`.
 
 - **Namespace:** `forum-wedkarskie`.
-- **Deployments:** backend (replicas: 2, HPA 2–6), frontend (replicas: 2), postgres (1, PVC), rabbitmq (1, PVC), pgadmin (1).
+- **Deployments:** backend (replicas: 2, HPA 2–6), frontend (replicas: 2), postgres (1, PVC), rabbitmq (1, PVC), minio (1, PVC), pgadmin (1).
 - **Charts (Helm):** `bitnami/rabbitmq`, `prometheus-community/kube-prometheus-stack`.
 - **Ingress NGINX:**
   - `/api/*` → backend (round-robin)
   - `/ws/*` → backend z `nginx.ingress.kubernetes.io/affinity: "cookie"` (sticky sessions)
   - `/` → frontend
-- **PVC `uploads-pvc`** — w minikube `hostpath` z accessMode `ReadWriteOnce`. Komentarz w manifeście:
-  *w prawdziwym klastrze podmienić na ReadWriteMany (NFS / EFS / Azure Files)*.
+- **PVC `uploads-pvc`** — legacy (po fazie 3 bajty ida do MinIO). Moze zostac jako zgodnosc
+  dla starego kodu lub zostac usuniety po pelnym przejsciu na files.
 - **NetworkPolicy:** backend → postgres tylko z odpowiednim label selectorem.
 - **Probes:** liveness, readiness, **startup** (Alembic upgrade head trwa kilka sekund).
 - **Migration Job:** `alembic upgrade head` jako Kubernetes Job przed startem aplikacji (nie init-container — unikamy race condition przy `replicas>1`).
