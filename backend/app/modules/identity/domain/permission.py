@@ -55,6 +55,7 @@ PERMISSION_CODES: tuple[str, ...] = (
     "file.delete.own",
     "file.delete.any",
     # categories / tags
+    "category.create",
     "category.manage",
     "tag.manage",
     # admin
@@ -77,6 +78,9 @@ _USER_BUNDLE: tuple[str, ...] = (
     "file.upload",
     "file.download",
     "file.delete.own",
+    # Każdy zalogowany użytkownik może założyć nową kategorię (decyzja produktowa).
+    # Usuwanie kategorii pozostaje przy moderatorze (``category.manage``).
+    "category.create",
 )
 
 _MOD_EXTRA: tuple[str, ...] = (

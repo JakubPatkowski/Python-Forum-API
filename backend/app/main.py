@@ -137,6 +137,12 @@ def create_app() -> FastAPI:
 
     app.include_router(files_router, prefix="/api/v1", tags=["files"])
 
+    # Step 7c.bis — engagement (polubienia + statystyki usera). Cienki moduł SQL;
+    # mount na /api/v1 (ścieżki .../{id}/like, /users/{id}/stats).
+    from app.modules.engagement.router import router as engagement_router
+
+    app.include_router(engagement_router, prefix="/api/v1", tags=["engagement"])
+
     # Step 7d — legacy admin SSR panel (attachments router removed in phase 3).
     from app.routers import admin
 

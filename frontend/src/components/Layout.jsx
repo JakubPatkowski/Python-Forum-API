@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useLang } from '../i18n/LangContext';
 import { TopBar } from './TopBar';
@@ -14,11 +15,15 @@ import { Footer } from './Footer';
 export function Layout() {
   const { lang } = useLang();
   const { pathname } = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Zamknij mobilne menu po zmianie trasy.
+  useEffect(() => setNavOpen(false), [pathname]);
 
   return (
     <div className="app">
-      <TopBar />
-      <SubNav />
+      <TopBar navOpen={navOpen} onToggleNav={() => setNavOpen((o) => !o)} />
+      <SubNav mobileOpen={navOpen} onNavigate={() => setNavOpen(false)} />
       <main className="view fade-key" key={`${pathname}_${lang}`}>
         <Outlet />
       </main>
