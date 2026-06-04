@@ -19,6 +19,9 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import text
+
+from app.shared.presentation.deps import DbSession
 from fastapi.responses import RedirectResponse
 
 from app.container import (
@@ -29,11 +32,13 @@ from app.container import (
     get_get_avatar_uc,
     get_get_category_image_uc,
     get_get_file_uc,
+    get_get_post_icon_uc,
     get_list_my_files_uc,
     get_list_owner_files_uc,
     get_request_upload_uc,
     get_set_avatar_uc,
     get_set_category_image_uc,
+    get_set_post_icon_uc,
 )
 from app.modules.files.application.commands import (
     AttachFilesCommand,
@@ -45,6 +50,7 @@ from app.modules.files.application.commands import (
     RequestUploadCommand,
     SetAvatarCommand,
     SetCategoryImageCommand,
+    SetPostIconCommand,
 )
 from app.modules.files.application.use_cases import (
     AttachFilesUseCase,
@@ -54,11 +60,13 @@ from app.modules.files.application.use_cases import (
     GetAvatarUseCase,
     GetCategoryImageUseCase,
     GetFileUseCase,
+    GetPostIconUseCase,
     ListMyFilesUseCase,
     ListOwnerFilesUseCase,
     RequestUploadUseCase,
     SetAvatarUseCase,
     SetCategoryImageUseCase,
+    SetPostIconUseCase,
 )
 from app.modules.files.domain.value_objects import FileOwnerType
 from app.modules.files.presentation.deps import OptionalCurrentUser
@@ -393,14 +401,32 @@ async def get_user_avatar(
 @router.post(
     "/categories/{category_id}/image",
     response_model=FileResponse,
-    summary="Upload and set a category image (requires category.manage)",
+    summary="Set a category image (owner or category.manage)",
 )
 async def set_category_image(
     category_id: UUID,
-    user: Annotated[CurrentUser, Depends(requires("category.manage"))],
+    db: DbSession,
+    user: Annotated[CurrentUser, Depends(requires("category.create"))],
     uc: Annotated[SetCategoryImageUseCase, Depends(get_set_category_image_uc)],
     file: UploadFile = File(...),
 ) -> FileResponse:
+    # Ownership: właściciel kategorii LUB moderator (category.manage).
+    owner_row = db.execute(
+        text(
+            "SELECT u.public_id FROM categories c "
+            "LEFT JOIN users u ON u.id = c.owner_id "
+            "WHERE c.public_id = :cid"
+        ),
+        {"cid": str(category_id)},
+    ).first()
+    if owner_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    is_owner = owner_row[0] is not None and str(owner_row[0]) == str(user.public_id)
+    if not is_owner and not user.has("category.manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the category owner or a moderator can set its image",
+        )
     name, content_type, data = await _read_upload(file)
     result = await uc.execute(
         SetCategoryImageCommand(
@@ -429,5 +455,73 @@ async def get_category_image(
     view = result.value  # type: ignore[union-attr]
     if view is None:
         raise HTTPException(status_code=404, detail="No category image set")
+    target = view.variants[variant].url if variant in view.variants else view.url
+    return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+# --------------------------------------------------------------------------- #
+# Post (thread) icons — ikona wątku (owner_type=post_icon)                    #
+# --------------------------------------------------------------------------- #
+
+
+@router.post(
+    "/posts/{post_id}/icon",
+    response_model=FileResponse,
+    summary="Set a post (thread) icon (author or post.update.any)",
+)
+async def set_post_icon(
+    post_id: UUID,
+    db: DbSession,
+    user: CurrentUser,
+    uc: Annotated[SetPostIconUseCase, Depends(get_set_post_icon_uc)],
+    file: UploadFile = File(...),
+) -> FileResponse:
+    # Autoryzacja: autor wątku LUB moderator (post.update.any).
+    author_row = db.execute(
+        text(
+            "SELECT u.public_id FROM posts p "
+            "LEFT JOIN users u ON u.id = p.author_id "
+            "WHERE p.public_id = :pid"
+        ),
+        {"pid": str(post_id)},
+    ).first()
+    if author_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+    is_author = author_row[0] is not None and str(author_row[0]) == str(user.public_id)
+    if not is_author and not user.has("post.update.any"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the thread author or a moderator can set its icon",
+        )
+    name, content_type, data = await _read_upload(file)
+    result = await uc.execute(
+        SetPostIconCommand(
+            actor_public_id=user.public_id,
+            post_public_id=post_id,
+            original_name=name,
+            content_type=content_type,
+            data=data,
+        )
+    )
+    _raise_if_error(result)
+    return FileResponse.from_view(result.value)  # type: ignore[union-attr]
+
+
+@router.get(
+    "/posts/{post_id}/icon",
+    summary="Redirect to a post's icon image (404 if none)",
+)
+async def get_post_icon(
+    post_id: UUID,
+    uc: Annotated[GetPostIconUseCase, Depends(get_get_post_icon_uc)],
+    variant: str | None = Query(default=None, max_length=32),
+) -> RedirectResponse:
+    result = await uc.execute(post_id)
+    _raise_if_error(result)
+    view = result.value  # type: ignore[union-attr]
+    if view is None:
+        raise HTTPException(status_code=404, detail="No post icon set")
     target = view.variants[variant].url if variant in view.variants else view.url
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)

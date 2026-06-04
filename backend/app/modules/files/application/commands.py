@@ -84,6 +84,17 @@ class SetCategoryImageCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class SetPostIconCommand:
+    """Upload an image and set it as a post's (thread's) icon."""
+
+    actor_public_id: UUID
+    post_public_id: UUID
+    original_name: str
+    content_type: str
+    data: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class ListOwnerFilesQuery:
     owner_type: FileOwnerType
     owner_public_id: UUID

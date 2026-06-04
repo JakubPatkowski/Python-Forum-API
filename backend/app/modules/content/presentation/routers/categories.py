@@ -6,6 +6,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import text
+
+from app.shared.presentation.deps import DbSession
 
 from app.container import (
     get_create_category_uc,
@@ -43,27 +46,54 @@ def _raise_if_error(result) -> None:
     summary="List categories",
 )
 async def list_categories(
+    db: DbSession,
     uc: Annotated[ListCategoriesUseCase, Depends(get_list_categories_uc)],
 ) -> list[CategoryResponse]:
     result = await uc.execute()
     _raise_if_error(result)
-    return [CategoryResponse.from_summary(c) for c in result.value]  # type: ignore[union-attr]
+    # Dociągnij właścicieli jednym zapytaniem (public_id kategorii → public_id ownera).
+    owners = {
+        str(row[0]): row[1]
+        for row in db.execute(
+            text(
+                "SELECT c.public_id, u.public_id FROM categories c "
+                "LEFT JOIN users u ON u.id = c.owner_id"
+            )
+        ).all()
+    }
+    return [
+        CategoryResponse.from_summary(c, owner_id=owners.get(str(c.public_id)))
+        for c in result.value  # type: ignore[union-attr]
+    ]
 
 
 @router.post(
     "",
     response_model=CategoryResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new category (moderator+)",
+    summary="Create a new category (any authenticated user)",
 )
 async def create_category(
     body: CreateCategoryRequest,
-    _user=Depends(requires("category.manage")),
+    db: DbSession,
+    user=Depends(requires("category.create")),
     uc: CreateCategoryUseCase = Depends(get_create_category_uc),
 ) -> CategoryResponse:
     result = await uc.execute(body.to_command())
     _raise_if_error(result)
-    return CategoryResponse.from_summary(result.value)  # type: ignore[union-attr]
+    summary = result.value  # type: ignore[union-attr]
+    # Zapisz właściciela kategorii (twórcę). Robione osobnym UPDATE-em, żeby nie
+    # mieszać ownershipu do agregatu domenowego Category.
+    db.execute(
+        text(
+            "UPDATE categories SET owner_id = "
+            "(SELECT id FROM users WHERE public_id = :uid) "
+            "WHERE public_id = :cid"
+        ),
+        {"uid": str(user.public_id), "cid": str(summary.public_id)},
+    )
+    db.commit()
+    return CategoryResponse.from_summary(summary, owner_id=user.public_id)
 
 
 @router.delete(

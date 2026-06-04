@@ -186,6 +186,8 @@ class SqlAlchemyFileRepository:
     def _owner_column_for(self, owner_type: FileOwnerType):  # type: ignore[no-untyped-def]
         return {
             FileOwnerType.POST: FileOrm.owner_post_id,
+            # Ikona wątku korzysta z tej samej kolumny FK co załączniki posta.
+            FileOwnerType.POST_ICON: FileOrm.owner_post_id,
             FileOwnerType.COMMENT: FileOrm.owner_comment_id,
             FileOwnerType.USER_AVATAR: FileOrm.owner_user_id,
             FileOwnerType.CATEGORY: FileOrm.owner_category_id,
@@ -195,7 +197,7 @@ class SqlAlchemyFileRepository:
         self, owner_type: FileOwnerType, owner_public_id: UUID
     ) -> int | None:
         match owner_type:
-            case FileOwnerType.POST:
+            case FileOwnerType.POST | FileOwnerType.POST_ICON:
                 return self._resolve_post(owner_public_id)
             case FileOwnerType.COMMENT:
                 return self._resolve_comment(owner_public_id)
@@ -213,8 +215,9 @@ class SqlAlchemyFileRepository:
         if file.owner_id is None or file.owner_type is FileOwnerType.STANDALONE:
             return (None, None, None, None)
         internal = self._resolve_owner_internal(file.owner_type, file.owner_id)
+        post_types = (FileOwnerType.POST, FileOwnerType.POST_ICON)
         return (
-            internal if file.owner_type is FileOwnerType.POST else None,
+            internal if file.owner_type in post_types else None,
             internal if file.owner_type is FileOwnerType.COMMENT else None,
             internal if file.owner_type is FileOwnerType.USER_AVATAR else None,
             internal if file.owner_type is FileOwnerType.CATEGORY else None,

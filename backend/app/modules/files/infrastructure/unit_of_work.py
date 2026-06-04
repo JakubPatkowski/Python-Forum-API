@@ -133,6 +133,22 @@ class SqlAlchemyFilesUnitOfWork(IFilesUnitOfWork):
             .limit(1)
         )
 
+    async def current_post_icon_file_public_id(
+        self, post_public_id: UUID
+    ) -> UUID | None:
+        post_id = self._sync_resolve_post(post_public_id)
+        if post_id is None:
+            return None
+        return self._session_required().scalar(
+            select(FileOrm.public_id)
+            .where(
+                FileOrm.owner_post_id == post_id,
+                FileOrm.owner_type == FileOwnerType.POST_ICON,
+            )
+            .order_by(FileOrm.created_at.desc())
+            .limit(1)
+        )
+
     # --- internal sync resolvers -------------------------------------------
 
     def _session_required(self) -> Session:

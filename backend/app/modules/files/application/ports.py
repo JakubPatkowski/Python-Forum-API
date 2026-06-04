@@ -192,3 +192,8 @@ class IFilesUnitOfWork(Protocol):
         self, category_public_id: UUID
     ) -> UUID | None:
         """Public id of a category's current image file, if any."""
+
+    async def current_post_icon_file_public_id(
+        self, post_public_id: UUID
+    ) -> UUID | None:
+        """Public id of a post's current icon file, if any."""

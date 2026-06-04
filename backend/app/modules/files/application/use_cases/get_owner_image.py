@@ -56,3 +56,23 @@ class GetCategoryImageUseCase:
             if file is None or not file.is_ready:
                 return Ok(None)
             return Ok(await build_file_view(file, storage=self._storage))
+
+
+class GetPostIconUseCase:
+    """Return the post's current icon as a :class:`FileView`, or ``None``."""
+
+    def __init__(self, uow: IFilesUnitOfWork, storage: IFileStorage) -> None:
+        self._uow = uow
+        self._storage = storage
+
+    async def execute(
+        self, post_public_id: UUID
+    ) -> Result[FileView | None, DomainError]:
+        async with self._uow as uow:
+            public_id = await uow.current_post_icon_file_public_id(post_public_id)
+            if public_id is None:
+                return Ok(None)
+            file = await uow.files.get(FileId(public_id))
+            if file is None or not file.is_ready:
+                return Ok(None)
+            return Ok(await build_file_view(file, storage=self._storage))

@@ -20,6 +20,8 @@
   --text:          #e6ebf2;
   --text-dim:      #8a95a8;
   --text-mute:     #565f70;
+  /* czytelniejszy kolor dla treści (posty, opisy) niż przygaszony --text-dim */
+  --text-content:  #c7d3df;
 
   --accent:        #00d4ff;
   --accent-soft:   rgba(0, 212, 255, 0.14);
@@ -48,6 +50,7 @@
   --text:          #0a1018;
   --text-dim:      #4a5566;
   --text-mute:     #8893a4;
+  --text-content:  #2b3543;
 
   --accent:        #0084c7;
   --accent-soft:   rgba(0, 132, 199, 0.10);
@@ -130,6 +133,8 @@ body::after {
   align-items: center;
   gap: 24px;
   width: 100%;
+  /* relatywne, żeby pole wyszukiwania mogło być wyśrodkowane absolute */
+  position: relative;
 }
 
 .logo {
@@ -164,10 +169,14 @@ body::after {
 }
 .logo-text span { color: var(--accent); }
 
-/* search */
+/* search — wyśrodkowane w pasku, szerokość odpowiada głównej kolumnie */
 .search {
-  flex: 1;
-  max-width: 520px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  /* clamp: min 300px, normalnie viewport - logo - kontrolki - oddech, max 880 (=home-center) */
+  width: clamp(300px, calc(100vw - 620px), 880px);
   height: 38px;
   display: flex;
   align-items: center;
@@ -202,7 +211,7 @@ body::after {
 }
 
 /* topbar controls */
-.controls { display: flex; align-items: center; gap: 8px; }
+.controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .icon-btn {
   position: relative;
   width: 36px; height: 36px;
@@ -337,6 +346,7 @@ body::after {
   gap: 2px;
   height: 52px;
   align-items: stretch;
+  justify-content: center;
 }
 .tab {
   position: relative;
@@ -471,6 +481,73 @@ main.view {
   background: var(--surface);
   margin-top: 8px;
 }
+
+/* --- najlepszy wątek (nagłówek + statystyki + hero) -------------------- */
+.featured-block { margin-top: 8px; }
+.featured-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 8px;
+  flex-wrap: wrap;
+}
+.featured-label {
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+}
+.featured-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-mute);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.featured-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.featured-stat svg { color: var(--accent); }
+
+.featured-block .hero { margin-top: 0; }
+
+/* hero z ikoną wątku obok tekstu */
+.hero-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 6px;
+}
+.hero-icon {
+  flex: 0 0 auto;
+  width: 64px; height: 64px;
+}
+.hero-icon .cat-glyph {
+  width: 64px; height: 64px;
+  font-size: 18px;
+  border-radius: var(--radius-md);
+}
+.hero-text { min-width: 0; flex: 1; }
+.hero-text .tag { margin-bottom: 10px; }
+.hero-text h1 {
+  font-size: 30px;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.hero-text p {
+  margin: 0 0 18px;
+  color: var(--text-content);
+  max-width: 56ch;
+  font-size: 14px;
+  line-height: 1.6;
+}
 .hero-main {
   padding: 28px 32px;
   border-right: 1px solid var(--border);
@@ -493,7 +570,7 @@ main.view {
 }
 .hero-main p {
   margin: 0 0 18px;
-  color: var(--text-dim);
+  color: var(--text-content);
   max-width: 56ch;
   font-size: 14px;
   line-height: 1.6;
@@ -1065,4 +1142,987 @@ main.view {
   .profile-stats { grid-template-columns: repeat(2, 1fr); }
   .opinions-grid { grid-template-columns: 1fr; }
   .search { display: none; }
+}
+
+/* ====================================================================== */
+/* v0.3 — integracja z backendem: auth, formularze, modale, komentarze    */
+/* (dopisane przy podłączaniu realnych danych z API)                      */
+/* ====================================================================== */
+
+/* --- stany pomocnicze (loading / empty / error) ----------------------- */
+.state-box {
+  padding: 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 13px;
+  text-align: center;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+.state-error { color: var(--bad); border-color: var(--bad); }
+.route-loading { padding: 48px; text-align: center; color: var(--text-dim); }
+
+.ns-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  opacity: 0.85;
+}
+.placeholder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px;
+  font-size: 12px;
+}
+
+/* --- formularze (login / rejestracja / compose) ----------------------- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+.field-hint { font-size: 11px; color: var(--text-mute); }
+
+.field input,
+.field select,
+.field textarea,
+.comment-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 10px 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field textarea,
+.comment-form textarea { resize: vertical; line-height: 1.5; }
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.comment-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--accent-glow);
+}
+
+.btn.full { width: 100%; justify-content: center; }
+
+.form-error {
+  background: rgba(255, 107, 138, 0.10);
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* --- karta logowania -------------------------------------------------- */
+.auth-shell { max-width: 440px; margin: 0 auto; padding-top: 48px; }
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+}
+.auth-title { font-size: 22px; margin: 0 0 24px; }
+.auth-switch { margin-top: 18px; font-size: 13px; color: var(--text-dim); text-align: center; }
+.auth-switch a { color: var(--accent); text-decoration: none; }
+.auth-switch a:hover { text-decoration: underline; }
+
+/* --- modal ------------------------------------------------------------ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 12, 0.66);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 64px 16px;
+  z-index: 200;
+  overflow-y: auto;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 560px;
+  padding: 24px;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.modal-head h2 { font-size: 18px; margin: 0; }
+
+/* --- kategorie jako przyciski (klikalny filtr) ------------------------ */
+button.cat {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+.cat-active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 22px var(--accent-glow);
+}
+
+/* --- klikalne karty/wiersze ------------------------------------------ */
+.clickable { cursor: pointer; }
+.thread[role="link"], .review.clickable { cursor: pointer; }
+.activity-line.clickable:hover .what { color: var(--accent); }
+.center-row { display: flex; justify-content: center; margin-top: 24px; }
+
+/* --- strona posta ----------------------------------------------------- */
+.post-page { max-width: 860px; margin: 0 auto; }
+.post-full {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin: 16px 0 28px;
+}
+.post-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.post-title { font-size: 26px; line-height: 1.25; margin: 0 0 14px; }
+.post-author { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.post-content { font-size: 16px; line-height: 1.8; color: var(--text-content); }
+.post-titlebar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.post-titlebar .post-title { margin: 0; }
+.post-glyph { width: 48px; height: 48px; flex: 0 0 auto; }
+.post-glyph .cat-glyph { width: 48px; height: 48px; font-size: 14px; border-radius: var(--radius-md); }
+.author-link { text-decoration: none; color: inherit; }
+.author-link:hover .author { color: var(--accent); }
+
+.section-head-lite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  margin: 8px 0 16px;
+}
+.section-head-lite .head-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-mute);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 8px;
+}
+
+/* --- komentarze ------------------------------------------------------- */
+.comments-section { margin-top: 8px; }
+.comment-form { margin: 12px 0 24px; }
+.comment-list { margin-top: 20px; display: flex; flex-direction: column; gap: 16px; }
+.comment { border-left: none; }
+.comment-main {
+  display: flex;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.comment-main:hover { border-color: var(--border-strong); }
+.comment-body { flex: 1; min-width: 0; }
+.comment-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 6px; }
+.comment-meta .author { color: var(--text); font-weight: 600; }
+.comment-content { font-size: 14px; line-height: 1.65; color: var(--text-content); }
+.comment-deleted { font-style: italic; }
+.comment-actions {
+  display: flex; gap: 14px; margin-top: 10px; padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.comment-children {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-left: 2px solid var(--border);
+  padding-left: 14px;
+}
+
+.av.sm { width: 30px; height: 30px; font-size: 11px; }
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 0;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-btn.danger { color: var(--bad); }
+
+/* --- profil: about grid ---------------------------------------------- */
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 20px;
+}
+.about-k { font-size: 10px; color: var(--text-mute); }
+.about-v { font-size: 14px; margin-top: 6px; word-break: break-word; }
+
+/* --- treść markdown --------------------------------------------------- */
+.md p { margin: 0 0 10px; }
+.md p:last-child { margin-bottom: 0; }
+.md a { color: var(--accent); }
+.md code {
+  font-family: var(--font-mono);
+  background: var(--surface-3);
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  font-size: 0.9em;
+}
+.md pre {
+  background: var(--surface-3);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.md ul, .md ol { margin: 0 0 10px; padding-left: 20px; }
+
+/* ====================================================================== */
+/* v0.3 — pliki, awatary, edycja (faza B/C)                               */
+/* ====================================================================== */
+
+/* --- awatar jako obraz + rozmiary ------------------------------------- */
+.av { overflow: hidden; flex: 0 0 auto; }
+.av-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av-sm { width: 30px; height: 30px; font-size: 11px; }
+.av-md { width: 38px; height: 38px; font-size: 13px; }
+.av-xl {
+  width: 72px; height: 72px; font-size: 24px;
+  border-radius: var(--radius-md);
+}
+
+/* --- avatar w profilu + przycisk zmiany ------------------------------- */
+.profile-av-wrap { position: relative; width: 72px; height: 72px; }
+.avatar-edit {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.avatar-edit:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+
+/* --- glyph kategorii jako obraz --------------------------------------- */
+.cat-glyph-img { padding: 0; overflow: hidden; }
+.cat-glyph-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* --- uploader --------------------------------------------------------- */
+.uploader { display: flex; flex-direction: column; gap: 8px; }
+.upload-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.upload-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.upload-item.error { border-color: var(--bad); }
+.upload-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.comment-form-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.comment-form-foot .form-actions { margin-top: 0; }
+.edit-box textarea { width: 100%; box-sizing: border-box; }
+
+/* --- załączniki (galeria + dokumenty) --------------------------------- */
+.attachments { margin: 14px 0; display: flex; flex-direction: column; gap: 10px; }
+.attach-gallery { display: flex; flex-wrap: wrap; gap: 8px; }
+.attach-thumb {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.attach-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attach-thumb:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+.attach-files { display: flex; flex-direction: column; gap: 6px; }
+.attach-doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+.attach-doc:hover { border-color: var(--accent); }
+.attach-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ====================================================================== */
+/* v0.3 — edytor markdown, media inline, panel admina (faza 2)            */
+/* ====================================================================== */
+
+/* --- media w treści (markdown) --------------------------------------- */
+.md img { max-width: 100%; height: auto; border-radius: var(--radius-md); margin: 8px 0; }
+.md video { max-width: 100%; border-radius: var(--radius-md); margin: 8px 0; display: block; }
+.md u { text-decoration: underline; }
+.md blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 8px 0;
+  padding: 4px 0 4px 14px;
+  color: var(--text-dim);
+}
+
+/* --- edytor markdown -------------------------------------------------- */
+.mde { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); overflow: hidden; }
+.mde-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.mde-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+.mde-btn:hover { color: var(--accent); border-color: var(--accent); }
+.mde-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.mde-btn.tb-b { font-weight: 800; }
+.mde-btn.tb-i { font-style: italic; }
+.mde-btn.tb-u { text-decoration: underline; }
+.mde-btn.tb-s { text-decoration: line-through; }
+.mde-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px;
+  resize: vertical;
+}
+.mde-textarea:focus { outline: none; }
+.mde-preview { padding: 12px; min-height: 80px; font-size: 14px; }
+
+/* --- media załączników (wideo/audio) --------------------------------- */
+.attach-media { max-width: 100%; max-height: 420px; border-radius: var(--radius-md); background: #000; }
+.attach-audio { width: 100%; }
+
+/* --- akcje kategorii + ikona wątku ----------------------------------- */
+.cat-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.thread-icon { width: 44px; height: 44px; flex: 0 0 auto; }
+.thread-icon .cat-glyph { width: 44px; height: 44px; }
+
+/* --- panel admina ---------------------------------------------------- */
+.admin-list { display: flex; flex-direction: column; gap: 12px; }
+.admin-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.6fr 1.2fr;
+  gap: 16px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.admin-user { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.admin-user .name { font-size: 14px; }
+.admin-roles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.role-chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 10px; opacity: 0.7; }
+.chip-x:hover { opacity: 1; color: var(--bad); }
+.role-add { display: inline-flex; align-items: center; gap: 4px; }
+.role-add select { padding: 4px 6px; font-size: 12px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+.admin-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.admin-perms {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.admin-perms input { flex: 1; min-width: 200px; padding: 8px 10px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.perm-list { flex-basis: 100%; font-size: 11px; }
+
+@media (max-width: 720px) {
+  .admin-row { grid-template-columns: 1fr; }
+  .admin-status { justify-content: flex-start; }
+}
+
+/* ====================================================================== */
+/* v0.3 — engagement (polubienia, statystyki) + header kategorii          */
+/* ====================================================================== */
+
+/* --- przycisk polubienia --------------------------------------------- */
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 3px 9px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.like-btn:hover:not(:disabled) { color: var(--bad); border-color: var(--bad); }
+.like-btn:disabled { cursor: default; opacity: 0.8; }
+.like-btn.liked { color: var(--bad); border-color: var(--bad); background: rgba(255,107,138,0.10); }
+.like-btn.liked svg { fill: var(--bad); }
+.like-sm { padding: 2px 7px; font-size: 11px; }
+.like-count { line-height: 1; }
+.post-engagement { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--border); }
+
+/* --- header kategorii (strip ikon nad „wątkiem tygodnia") ------------- */
+.cat-header {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.cat-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.cat-header-title { font-size: 11px; color: var(--text-mute); letter-spacing: 0.08em; }
+.cat-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.cat-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: 6px 8px 6px 6px;
+  flex: 0 0 auto;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cat-chip:hover { border-color: var(--accent); }
+.cat-chip.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 16px var(--accent-glow); }
+.cat-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.cat-chip-glyph { width: 34px; height: 34px; flex: 0 0 auto; }
+.cat-chip-glyph .cat-glyph { width: 34px; height: 34px; font-size: 11px; border-radius: var(--radius); }
+.cat-chip-name { font-size: 13px; white-space: nowrap; }
+.cat-chip-all {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-3); border-radius: var(--radius); color: var(--accent);
+}
+.cat-chip-edit, .cat-chip-del {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  color: var(--text-mute);
+  cursor: pointer;
+  font-size: 11px;
+}
+.cat-chip-edit:hover { color: var(--accent); border-color: var(--accent); }
+.cat-chip-del:hover { color: var(--bad); border-color: var(--bad); }
+
+/* statystyki profilu — dołożone komórki (klasy .profile-stats/.pstat już są) */
+
+/* ====================================================================== */
+/* v0.4 — układ 3-panelowy strony głównej (lewy/środek/prawy)             */
+/* ====================================================================== */
+
+/* IDENTYCZNE wymiary dla strony forum (home) i pojedynczego wątku (post).
+   Wspólne selektory — nie dwa zestawy z "podobnymi" wartościami. */
+.home-wrap, .post-wrap { width: 100%; }
+
+/* domyślnie (ekrany średnie): siatka 3-kolumnowa w obrębie shella */
+.home-layout, .post-layout {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr) 288px;
+  gap: 24px;
+  align-items: start;
+  max-width: 1320px;
+  margin: 24px auto 0;
+  padding: 0 28px;
+}
+.home-left, .home-right, .post-side {
+  position: sticky; top: 80px;
+  /* Maksymalna wysokość panelu, żeby nie zachodził na stopkę gdy ma długą zawartość */
+  max-height: calc(100vh - 100px);
+  overflow-y: auto; overflow-x: hidden;
+}
+.home-right, .post-side.right { display: flex; flex-direction: column; gap: 20px; }
+.home-center, .post-center { min-width: 0; }
+/* brak panelu statystyk obok hero → jedna kolumna, bez kreski po prawej */
+.home-center .hero { grid-template-columns: 1fr; margin-top: 0; }
+.home-center .hero-main { border-right: none; }
+
+/* przyciski zwijania/rozwijania paneli — aktywne tylko w trybie przyklejonym */
+.panel-collapse, .panel-reveal { display: none; }
+
+/* --- panel boczny (lewy: kategorie) ---------------------------------- */
+.side-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+.side-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-mute);
+}
+.side-add {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.side-add:hover { color: var(--accent); border-color: var(--accent); }
+
+.cat-list { display: flex; flex-direction: column; gap: 4px; }
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cat-row:hover { background: var(--surface-2); }
+.cat-row.on { background: var(--accent-soft); border-color: var(--accent); }
+.cat-row-main {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; min-width: 0;
+  background: none; border: none; color: inherit; cursor: pointer; font: inherit; padding: 0;
+}
+.cat-row-glyph { width: 40px; height: 40px; flex: 0 0 auto; }
+.cat-row-glyph .cat-glyph { width: 40px; height: 40px; font-size: 12px; border-radius: var(--radius-md); }
+.cat-row-glyph.all {
+  display: inline-flex; align-items: center; justify-content: center; font-size: 18px;
+  background: var(--surface-3); color: var(--accent); border-radius: var(--radius-md);
+}
+.cat-row-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-row-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+.cat-row:hover .cat-row-actions { opacity: 1; }
+
+/* --- nagłówek kategorii (środek) ------------------------------------- */
+.cat-banner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px;
+  margin-bottom: 18px;
+}
+.cat-banner-glyph { flex: 0 0 auto; }
+.cat-banner-glyph .cat-glyph {
+  width: 64px; height: 64px; font-size: 18px;
+  border-radius: var(--radius-md);
+}
+.cat-banner-text { min-width: 0; }
+.cat-banner-label { display: block; font-size: 10px; color: var(--accent); margin-bottom: 6px; }
+.cat-banner-text h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.02em; text-wrap: balance; }
+.cat-banner-text p { margin: 0; color: var(--text-content); font-size: 14px; line-height: 1.55; }
+
+/* --- wybór ikony (modale tworzenia wątku/kategorii) ------------------ */
+.icon-picker { display: flex; align-items: center; gap: 14px; }
+.icon-picker-preview {
+  width: 64px; height: 64px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-mute);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+.icon-picker-preview:hover { border-color: var(--accent); color: var(--accent); }
+.icon-picker-preview img { width: 100%; height: 100%; object-fit: cover; }
+.icon-picker-side { display: flex; flex-direction: column; gap: 6px; }
+.icon-picker-actions { display: flex; align-items: center; gap: 8px; }
+
+/* --- TRYB PRZYKLEJONY: panele przy krawędziach ekranu (≥1560px) -------- */
+/* Środkowa kolumna jest wycentrowana niezależnie od paneli, więc ich
+   chowanie/pokazywanie NIE rusza głównego okna. Panele dostają mały
+   przycisk zwijania, a po schowaniu — wąską „zakładkę" do przywrócenia. */
+/* ładny scrollbar w przyklejonych panelach (kategorie / meta) */
+.home-left, .home-right, .post-side {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+.home-left::-webkit-scrollbar, .home-right::-webkit-scrollbar,
+.post-side::-webkit-scrollbar { width: 8px; }
+.home-left::-webkit-scrollbar-thumb, .home-right::-webkit-scrollbar-thumb,
+.post-side::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
+.home-left::-webkit-scrollbar-thumb:hover, .home-right::-webkit-scrollbar-thumb:hover,
+.post-side::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+.home-left::-webkit-scrollbar-track, .home-right::-webkit-scrollbar-track,
+.post-side::-webkit-scrollbar-track { background: transparent; }
+
+@media (min-width: 1280px) {
+  /* wspólny odstęp od krawędzi ekranu — używany też przez topbar/subnav */
+  :root {
+    --home-gutter: clamp(12px, 1.6vw, 56px);
+    --side-w: 240px;
+    /* środek skalowany z viewportem; max 880 = jak na desktopach */
+    --center-w: min(880px, calc(100vw - 600px));
+  }
+
+  /* topbar i subnav rozciągnięte do tej samej szerokości co panele */
+  .topbar .shell, .subnav .shell { max-width: none; padding-left: var(--home-gutter); padding-right: var(--home-gutter); }
+
+  /* ----- WSPÓLNY layout home + post: środek wycentrowany, panele fixed przy krawędziach ----- */
+  .home-layout, .post-layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .home-wrap, .post-wrap { width: 100%; margin: 0; }
+
+  .home-center, .post-center {
+    max-width: var(--center-w);
+    margin: 0 auto;
+    /* relatywne — pod ewentualne dzieci pozycjonowane absolute (np. post-back) */
+    position: relative;
+    /* 30px = (panel top:148 − subnav-bottom 118), żeby pierwsze dziecko środka
+       (cat-banner na home / post-full na post) miało top-y == top panelu */
+    padding-top: 30px;
+  }
+
+  .home-left, .home-right, .post-side {
+    position: fixed; top: 148px; z-index: 20;
+    width: var(--side-w);
+    max-height: calc(100vh - 168px - 90px);
+    overflow-y: auto; overflow-x: hidden; padding-bottom: 24px;
+  }
+  .home-left, .post-side.left { left: var(--home-gutter); }
+  .home-right, .post-side.right {
+    right: var(--home-gutter);
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ----- WRÓĆ wewnątrz post-center, absolute w obszarze padding-top (= 30px gap nad post-full)
+     żeby nie pchało post-full w dół ----- */
+  .post-back {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    margin: 0;
+  }
+  /* post-full bez górnego marginesu — z padding-top: 30px na post-center,
+     pierwsze dziecko (post-full) startuje dokładnie na top: 148px = top panelu. */
+  .post-full { margin-top: 0; }
+
+  /* ----- przyciski zwijania/rozwijania — SYMETRYCZNE dla lewej i prawej strony,
+     każdy w wewnętrznym górnym rogu swojego panelu ----- */
+  .panel-collapse, .panel-reveal {
+    position: fixed; z-index: 22;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-strong); background: var(--surface-2);
+    color: var(--text-dim); cursor: pointer;
+    border-radius: var(--radius-md);
+    transform: none;
+  }
+  .panel-collapse:hover, .panel-reveal:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* zwijanie — top, róg panelu od strony środka */
+  .panel-collapse { top: 156px; }
+  .panel-collapse.left  { left:  calc(var(--home-gutter) + var(--side-w) - 34px); }
+  .panel-collapse.right { right: calc(var(--home-gutter) + var(--side-w) - 34px); }
+
+  /* rozwijanie — top, krawędź ekranu (widoczne dopiero po schowaniu panelu) */
+  .panel-reveal { display: none; top: 156px; }
+  .panel-reveal.left  { left:  8px; }
+  .panel-reveal.right { right: 8px; }
+
+  .left-collapsed .home-left,
+  .post-layout.left-collapsed .post-side.left { display: none; }
+  .right-collapsed .home-right,
+  .post-layout.right-collapsed .post-side.right { display: none; }
+  .left-collapsed .panel-collapse.left { display: none; }
+  .right-collapsed .panel-collapse.right { display: none; }
+  .left-collapsed .panel-reveal.left { display: flex; }
+  .right-collapsed .panel-reveal.right { display: flex; }
+}
+
+/* --- responsywność: tablet → 2 kolumny, panele w toku --------------- */
+@media (max-width: 1180px) {
+  .home-layout, .post-layout { grid-template-columns: 208px minmax(0, 1fr); }
+  .home-left, .home-right, .post-side { position: static; max-height: none; overflow: visible; }
+  .home-right, .post-side.right {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+@media (max-width: 760px) {
+  .home-layout { grid-template-columns: 1fr; gap: 18px; padding: 0 16px; }
+  .home-right { grid-template-columns: 1fr; }
+  /* kategorie jako poziomy, przewijalny pasek o stałej szerokości kafelków */
+  .home-left .cat-list {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 6px;
+    scroll-snap-type: x proximity;
+  }
+  .home-left .cat-row { width: auto; flex: 0 0 auto; min-width: 156px; scroll-snap-align: start; }
+  .home-left .cat-row-name { max-width: 96px; }
+  .home-left .cat-row-actions { display: none; }
+  .cat-banner { padding: 16px 18px; gap: 14px; }
+  .cat-banner-glyph .cat-glyph { width: 52px; height: 52px; font-size: 15px; }
+  .cat-banner-text h1 { font-size: 20px; }
+}
+
+/* ====================================================================== */
+/* v0.4 — nawigacja: placeholdery „wkrótce", hamburger + mobilne menu     */
+/* ====================================================================== */
+
+/* zakładki-placeholdery (sekcje jeszcze nie istnieją) */
+.tab.soon { color: var(--text-mute); cursor: default; }
+.tab.soon:hover { color: var(--text-mute); }
+.tab.soon .tab-soon {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--warn);
+  border: 1px solid var(--warn); border-radius: var(--radius);
+  padding: 0 4px; margin-left: 2px; opacity: 0.85;
+}
+
+/* hamburger (domyślnie ukryty — pojawia się na wąskich ekranach) */
+.hamburger {
+  display: none;
+  width: 36px; height: 36px;
+  align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); cursor: pointer; flex: 0 0 auto;
+}
+.hamburger:hover { color: var(--accent); border-color: var(--accent); }
+
+@media (max-width: 860px) {
+  .hamburger { display: inline-flex; }
+  .subnav { position: relative; }
+  .subnav .tabs { display: none; }
+  /* menu rozwijane spod paska */
+  .subnav.open .tabs {
+    display: flex; flex-direction: column; height: auto; gap: 2px;
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--surface); border-bottom: 1px solid var(--border-strong);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45); padding: 8px; z-index: 80;
+  }
+  .subnav.open .tabs .tab { height: 46px; padding: 0 14px; }
+  .subnav.open .tabs .tab.soon { justify-content: flex-start; gap: 8px; }
+  .subnav.open .tabs .tab.active::after {
+    left: 0; right: auto; top: 10px; bottom: 10px;
+    width: 3px; height: auto;
+  }
+  .controls .seg { display: none; } /* przełącznik języka trafia do menu profilu/innego miejsca */
+}
+
+@media (max-width: 640px) {
+  /* zostaw tylko motyw + avatar, żeby avatar był zawsze widoczny */
+  .controls .icon-btn[aria-label="notifications"],
+  .controls .icon-btn[aria-label="messages"] { display: none; }
+  .avatar-name { display: none; }
+  .avatar-btn { padding: 4px; }
+  .topbar .row { gap: 10px; }
+}
+
+/* ====================================================================== */
+/* v0.4 — strona pojedynczego wątku                                       */
+/* Uwaga: layout (wrap/layout/center/side) jest WSPÓLNY z home —          */
+/* zdefiniowany wyżej selektorami .home-X, .post-X razem. Tu zostają      */
+/* tylko style specyficzne dla post (post-back, post-page legacy).        */
+/* ====================================================================== */
+
+/* WRÓĆ — link na górze środkowej kolumny; w trybie ≥1280px ma position:absolute */
+.post-back { display: inline-block; margin: 0 0 16px; }
+
+/* poprzedni post-page (wąski) nie obowiązuje w nowym układzie */
+.post-layout .post-page { max-width: none; margin: 0; }
+
+/* karta autora */
+.author-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px;
+  text-align: center;
+}
+.author-card .av { margin: 0 auto 12px; }
+.author-card-head {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: 100%; background: none; border: none; padding: 0; cursor: pointer; color: inherit;
+}
+.author-card-head:disabled { cursor: default; }
+.author-card-head .av { margin: 0 auto; }
+.author-card-head:not(:disabled):hover .author-name { color: var(--accent); }
+.author-name { font-size: 15px; font-weight: 600; }
+.author-joined { font-size: 10px; margin-top: 8px; letter-spacing: 0.06em; }
+
+/* lista wątków autora w lewym panelu */
+.author-threads { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); text-align: left; }
+.author-threads-head { font-size: 10px; color: var(--text-mute); margin-bottom: 8px; }
+.author-thread {
+  display: flex; align-items: center; gap: 10px; padding: 7px 0;
+  color: var(--text); text-decoration: none; font-size: 13px;
+}
+.author-thread:hover { color: var(--accent); }
+.author-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: 16px;
+}
+.author-stat { background: var(--surface); padding: 12px 8px; }
+.author-stat .v { font-family: var(--font-mono); font-size: 18px; color: var(--text); }
+.author-stat .k {
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-mute); margin-top: 3px;
+}
+
+/* metadane wątku */
+.meta-list { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
+.meta-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.meta-row .k {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-mute);
+}
+.meta-row .v { font-size: 13px; color: var(--text); text-align: right; }
+
+/* podobne wątki */
+.suggested-list { display: flex; flex-direction: column; }
+.suggested-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  color: var(--text); text-decoration: none; font-size: 13px;
+}
+.suggested-item:first-child { border-top: none; }
+.suggested-item:hover { background: var(--surface-2); color: var(--accent); }
+.suggested-glyph { width: 30px; height: 30px; flex: 0 0 auto; }
+.suggested-glyph .cat-glyph { width: 30px; height: 30px; font-size: 9px; border-radius: var(--radius); }
+.suggested-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .post-layout { grid-template-columns: 240px minmax(0, 1fr); }
+  .post-side { position: static; }
+  .post-side.right { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+}
+@media (max-width: 820px) {
+  .post-wrap { padding: 0 16px; }
+  .post-layout { grid-template-columns: 1fr; gap: 18px; }
+  .post-side.right { grid-template-columns: 1fr; }
 }

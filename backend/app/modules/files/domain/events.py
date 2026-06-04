@@ -62,3 +62,11 @@ class CategoryImageChanged(DomainEvent):
 
     category_id: UUID
     file_id: UUID | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PostIconChanged(DomainEvent):
+    """A post's (thread's) icon was set or cleared."""
+
+    post_id: UUID
+    file_id: UUID | None

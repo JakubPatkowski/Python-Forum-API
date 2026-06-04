@@ -12,6 +12,7 @@ from app.modules.files.application.use_cases.get_file import GetFileUseCase
 from app.modules.files.application.use_cases.get_owner_image import (
     GetAvatarUseCase,
     GetCategoryImageUseCase,
+    GetPostIconUseCase,
 )
 from app.modules.files.application.use_cases.list_my_files import ListMyFilesUseCase
 from app.modules.files.application.use_cases.list_owner_files import (
@@ -22,6 +23,7 @@ from app.modules.files.application.use_cases.set_avatar import SetAvatarUseCase
 from app.modules.files.application.use_cases.set_category_image import (
     SetCategoryImageUseCase,
 )
+from app.modules.files.application.use_cases.set_post_icon import SetPostIconUseCase
 from app.modules.files.application.use_cases.upload_direct import DirectUploadUseCase
 
 __all__ = [
@@ -32,10 +34,12 @@ __all__ = [
     "DirectUploadUseCase",
     "GetAvatarUseCase",
     "GetCategoryImageUseCase",
+    "GetPostIconUseCase",
     "GetFileUseCase",
     "ListMyFilesUseCase",
     "ListOwnerFilesUseCase",
     "RequestUploadUseCase",
     "SetAvatarUseCase",
     "SetCategoryImageUseCase",
+    "SetPostIconUseCase",
 ]

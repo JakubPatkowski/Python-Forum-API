@@ -42,11 +42,13 @@ from app.modules.files.application.use_cases import (
     GetAvatarUseCase,
     GetCategoryImageUseCase,
     GetFileUseCase,
+    GetPostIconUseCase,
     ListMyFilesUseCase,
     ListOwnerFilesUseCase,
     RequestUploadUseCase,
     SetAvatarUseCase,
     SetCategoryImageUseCase,
+    SetPostIconUseCase,
 )
 from app.modules.files.infrastructure import (
     MinioFileStorage,
@@ -332,6 +334,19 @@ def get_get_avatar_uc() -> GetAvatarUseCase:
 
 def get_get_category_image_uc() -> GetCategoryImageUseCase:
     return GetCategoryImageUseCase(uow=get_files_uow(), storage=get_file_storage())
+
+
+def get_set_post_icon_uc() -> SetPostIconUseCase:
+    return SetPostIconUseCase(
+        uow=get_files_uow(),
+        storage=get_file_storage(),
+        processor=get_file_processor(),
+        bus=get_event_bus(),
+    )
+
+
+def get_get_post_icon_uc() -> GetPostIconUseCase:
+    return GetPostIconUseCase(uow=get_files_uow(), storage=get_file_storage())
 
 
 def get_cleanup_orphans_uc() -> CleanupOrphansUseCase:

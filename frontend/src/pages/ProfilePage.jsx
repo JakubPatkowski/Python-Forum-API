@@ -1,28 +1,41 @@
-import { useState } from 'react';
-import { useTranslation } from '../i18n/LangContext';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useLang } from '../i18n/LangContext';
+import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icon';
+import { Avatar } from '../components/Avatar';
 import { SectionHead } from '../components/SectionHead';
-import { TopUsersPanel, TagsPanel } from './HomePage';
+import { TagsPanel, TopUsersPanel } from '../components/Panels';
+import { LoadingState, EmptyState, ErrorState, NotSupportedTag } from '../components/States';
+import { usePosts } from '../hooks/useContentQueries';
+import { useSetAvatar } from '../hooks/useFiles';
+import { useUserStats } from '../hooks/useEngagement';
+import { timeAgo } from '../utils/format';
 
-const TABS = ['act', 'about', 'badges'];
+const TABS = ['act', 'about'];
 
+/** Profil zalogowanego użytkownika — realne dane z /users/me + jego posty. */
 export function ProfilePage() {
-  const t = useTranslation();
+  const { t, lang } = useLang();
   const p = t.profile;
+  const { user } = useAuth();
   const [tab, setTab] = useState(TABS[0]);
 
-  const tabLabels = { act: p.tabsAct, about: p.tabsAbout, badges: p.tabsBadges };
+  // ProtectedRoute gwarantuje, że user istnieje, ale dla bezpieczeństwa:
+  if (!user) return <div className="shell"><LoadingState /></div>;
+
+  const tabLabels = { act: p.tabsAct, about: p.tabsAbout };
 
   return (
     <div className="shell">
-      <ProfileHead p={p} />
-      <ProfileStats stats={p.stats} />
+      <ProfileHead user={user} p={p} />
+      <ProfileStats userId={user.id} p={p} lang={lang} />
 
       <div className="profile-grid">
         <div>
           <SectionHead
             title={tabLabels[tab]}
-            meta="UID 0xA482"
+            meta={`@${user.username}`}
             right={
               <div className="seg" style={{ height: 32 }}>
                 {TABS.map((id) => (
@@ -38,129 +51,144 @@ export function ProfilePage() {
               </div>
             }
           />
-          {tab === 'act'    && <ActivityPanel activity={p.activity} />}
-          {tab === 'about'  && <AboutCard p={p} />}
-          {tab === 'badges' && <BadgesPanel badges={p.badges} />}
+          {tab === 'act' && <MyPosts user={user} lang={lang} t={t} />}
+          {tab === 'about' && <AboutCard user={user} t={t} />}
         </div>
 
         <aside className="sidebar">
-          <TopUsersPanel
-            title={t.sections.trending}
-            meta={t.sections.trendingMeta}
-            users={t.topUsers.slice(0, 4)}
-          />
-          <TagsPanel
-            title={t.sections.tags}
-            meta={t.sections.tagsMeta}
-            tags={t.tags.slice(0, 8)}
-          />
+          <TopUsersPanel title={t.sections.trending} meta={t.sections.trendingMeta} />
+          <TagsPanel title={t.sections.tags} meta={t.sections.tagsMeta} limit={8} />
         </aside>
       </div>
     </div>
   );
 }
 
-function ProfileHead({ p }) {
+function ProfileHead({ user, p }) {
+  const { t } = useLang();
+  const inputRef = useRef(null);
+  const setAvatar = useSetAvatar();
+  const [version, setVersion] = useState(0);
+  const [error, setError] = useState(null);
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(null);
+    try {
+      await setAvatar.mutateAsync(file);
+      setVersion((v) => v + 1); // bust cache awatara
+    } catch (err) {
+      setError(err?.message ?? t.common.error);
+    }
+  };
+
   return (
     <div className="profile-head bracketed">
       <span className="br-tr" />
       <span className="br-bl" />
-      <div className="profile-av">JP</div>
+      <div className="profile-av-wrap">
+        <Avatar userId={user.id} username={user.username} size="xl" version={version} />
+        <button
+          type="button"
+          className="avatar-edit"
+          onClick={() => inputRef.current?.click()}
+          title={t.files.changeAvatar}
+          disabled={setAvatar.isPending}
+        >
+          <Icon name="edit" size={12} />
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={onPick} />
+      </div>
       <div className="profile-info">
-        <h1>{p.name}</h1>
-        <div className="handle">{p.handle}</div>
+        <h1>{user.username}</h1>
+        <div className="handle">{user.email}</div>
         <div className="profile-meta">
-          <span className="badge accent">{p.role}</span>
-          <span className="badge">⌖ {p.location}</span>
-          <span className="badge">{p.specialty}</span>
+          {(user.roles ?? []).map((r) => (
+            <span className="badge accent" key={r}>{r}</span>
+          ))}
+          <span className={'badge ' + (user.is_active ? 'ok' : 'warn')}>
+            {user.is_active ? 'active' : 'blocked'}
+          </span>
         </div>
+        {error && <div className="form-error" role="alert">{error}</div>}
       </div>
       <div className="profile-actions">
-        <div className="uid">{p.uid}</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn">
-            <Icon name="mail" size={12} /> {p.message}
-          </button>
-          <button type="button" className="btn primary">
-            <Icon name="edit" size={12} /> {p.edit}
-          </button>
-        </div>
+        <div className="uid mono dim">{shortId(user.id)}</div>
       </div>
     </div>
   );
 }
 
-function ProfileStats({ stats }) {
-  return (
-    <div className="profile-stats">
-      <Stat k={stats.posts}     v="1 482" />
-      <Stat k={stats.threads}   v="37" />
-      <Stat k={stats.reactions} v={<>3 921 <span className="small">↑ 124 / 30d</span></>} />
-      <Stat k={stats.rep}       v={<>8.7 <span className="small">/ 10.0</span></>} />
-    </div>
-  );
-}
-
-function Stat({ k, v }) {
-  return (
+function ProfileStats({ userId, p, lang }) {
+  const { data, isLoading } = useUserStats(userId);
+  const cell = (k, v) => (
     <div className="pstat">
       <div className="k">{k}</div>
-      <div className="v">{v}</div>
+      <div className="v">{isLoading ? '…' : v}</div>
+    </div>
+  );
+  return (
+    <div className="profile-stats">
+      {cell(p.stats.posts, data?.posts_count ?? 0)}
+      {cell(p.stats.comments, data?.comments_count ?? 0)}
+      {cell(p.stats.likes, data?.likes_received ?? 0)}
+      {cell(p.stats.joined, data?.joined_at ? fmtDate(data.joined_at) : '—')}
     </div>
   );
 }
 
-function ActivityPanel({ activity }) {
+function fmtDate(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toISOString().slice(0, 10);
+}
+
+function MyPosts({ user, lang, t }) {
+  const navigate = useNavigate();
+  const query = usePosts({ author_id: user.id });
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
+  const posts = query.data?.items ?? [];
+  if (posts.length === 0) return <EmptyState />;
+
   return (
     <div className="panel">
-      {activity.map((a, i) => (
-        // Treść `a.html` pochodzi ze statycznego słownika i18n (zaufane źródło).
-        // W przyszłości, gdy aktywność będzie z backendu, należy przejść na strukturalny model
-        // (np. tablica tokenów) zamiast surowego HTML.
-        // eslint-disable-next-line react/no-array-index-key
-        <div className="activity-line" key={i}>
-          <span className="time mono">{a.time}</span>
-          <span
-            className="what"
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: a.html }}
-          />
-          <span className="kind">{a.kind}</span>
+      {posts.map((post) => (
+        <div
+          className="activity-line clickable"
+          key={post.id}
+          onClick={() => navigate(`/posts/${post.id}`)}
+        >
+          <span className="time mono">{timeAgo(post.created_at, lang)}</span>
+          <span className="what">{post.title}</span>
+          <span className="kind">{post.comment_count} {t.compose.commentsTitle.toLowerCase()}</span>
         </div>
       ))}
     </div>
   );
 }
 
-function AboutCard({ p }) {
+function AboutCard({ user, t }) {
   return (
     <div className="card bracketed">
       <span className="br-tr" />
       <span className="br-bl" />
-      <p
-        style={{
-          margin: 0,
-          fontSize: 14,
-          lineHeight: 1.7,
-          color: 'var(--text-dim)',
-          maxWidth: '70ch',
-        }}
-      >
-        {p.about}
-      </p>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 24,
-          marginTop: 24,
-          paddingTop: 24,
-          borderTop: '1px dashed var(--border)',
-        }}
-      >
-        <AboutCell k={p.side.joined} v="2024.03.14" />
-        <AboutCell k={p.side.last}   v="14:22 UTC+1" />
-        <AboutCell k="specialty"     v={p.specialty} />
+      <div className="about-grid">
+        <AboutCell k="username" v={`@${user.username}`} />
+        <AboutCell k="email" v={user.email} />
+        <AboutCell k="id" v={shortId(user.id)} />
+        <AboutCell k="roles" v={(user.roles ?? []).join(', ') || '—'} />
+        <AboutCell
+          k="permissions"
+          v={`${(user.permissions ?? []).length} ${t.common.soon ? '' : ''}`.trim() || '0'}
+        />
+        <div>
+          <div className="mono up about-k">reputation</div>
+          <div className="mono about-v"><NotSupportedTag /></div>
+        </div>
       </div>
     </div>
   );
@@ -169,30 +197,13 @@ function AboutCard({ p }) {
 function AboutCell({ k, v }) {
   return (
     <div>
-      <div className="mono up" style={{ fontSize: 10, color: 'var(--text-mute)' }}>
-        {k}
-      </div>
-      <div className="mono" style={{ fontSize: 14, marginTop: 6 }}>
-        {v}
-      </div>
+      <div className="mono up about-k">{k}</div>
+      <div className="mono about-v">{v}</div>
     </div>
   );
 }
 
-function BadgesPanel({ badges }) {
-  return (
-    <div className="panel">
-      <div className="badge-grid">
-        {badges.map((b) => (
-          <div
-            key={b.name}
-            className={'badge-cell' + (b.unlocked ? '' : ' locked')}
-          >
-            <div className="badge-icon">{b.code}</div>
-            <div className="badge-name">{b.name}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function shortId(id) {
+  if (!id) return '—';
+  return `UID ${id.slice(0, 8)}`;
 }
