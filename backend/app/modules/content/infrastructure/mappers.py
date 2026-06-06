@@ -28,7 +28,6 @@ from app.modules.content.domain.value_objects import (
 )
 from app.modules.identity.domain.user import UserId
 
-
 # --------------------------------------------------------------------------- #
 # Time helpers — Postgres returns timezone-aware datetimes from columns with  #
 # ``timezone=True``; the legacy posts/comments tables still use naive UTC.    #
@@ -51,8 +50,8 @@ def _aware(value: datetime | None) -> datetime:
 
 def category_from_orm(row) -> Category:
     """Hydrate a :class:`Category` aggregate from a ``categories`` row."""
-    assert row.public_id is not None, "Category row missing public_id"  # noqa: S101
-    assert row.slug is not None, "Category row missing slug"  # noqa: S101
+    assert row.public_id is not None, "Category row missing public_id"
+    assert row.slug is not None, "Category row missing slug"
     return Category(
         id=CategoryId(row.public_id),
         name=row.name,
@@ -166,7 +165,7 @@ def comment_from_orm(row, *, author_public_id: UUID | None) -> Comment:
     # Phase-2 stores public_id on the comment row; legacy rows might not have
     # one until migration 0004 backfills them.
     public_id = row.public_id
-    assert public_id is not None, "Comment row missing public_id"  # noqa: S101
+    assert public_id is not None, "Comment row missing public_id"
 
     parent_public_id_attr = getattr(row, "_parent_public_id", None)
     parent_id = (
@@ -175,7 +174,7 @@ def comment_from_orm(row, *, author_public_id: UUID | None) -> Comment:
 
     return Comment(
         id=CommentId(public_id),
-        post_id=PostId(getattr(row, "_post_public_id")),
+        post_id=PostId(row._post_public_id),
         author_id=UserId(author_public_id) if author_public_id else None,
         parent_id=parent_id,
         content=MarkdownContent(

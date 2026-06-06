@@ -14,10 +14,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Final
 
-from app.shared.domain.entity import AggregateRoot
-from app.shared.domain.entity_id import EntityId
-from app.shared.domain.errors import ValidationError
-
 from app.modules.content.domain.events import (
     CommentAdded,
     CommentDeleted,
@@ -28,7 +24,9 @@ from app.modules.content.domain.value_objects import MarkdownContent
 
 # UserId is imported by UUID — see note in post.py.
 from app.modules.identity.domain.user import UserId
-
+from app.shared.domain.entity import AggregateRoot
+from app.shared.domain.entity_id import EntityId
+from app.shared.domain.errors import ValidationError
 
 # Path segment width — 8 digits supports IDs up to 99_999_999. Beyond that
 # the path is wider; the column accepts 200 chars so depth-8 fits.
@@ -110,9 +108,9 @@ class Comment(AggregateRoot[CommentId]):
         post_id: PostId,
         author_id: UserId | None,
         content: MarkdownContent,
-        parent: "Comment | None" = None,
+        parent: Comment | None = None,
         max_depth: int = 8,
-    ) -> "Comment":
+    ) -> Comment:
         """Factory for a fresh comment.
 
         Depth and path are seeded from the parent (if any). The repository

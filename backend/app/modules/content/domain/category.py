@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from app.modules.content.domain.value_objects import Slug
 from app.shared.domain.entity import Entity
 from app.shared.domain.entity_id import EntityId
-
-from app.modules.content.domain.value_objects import Slug
 
 
 class CategoryId(EntityId["Category"]):

@@ -1,13 +1,14 @@
-"""HTTP endpoints dla polubień i statystyk użytkownika.
+"""HTTP endpoints for likes and per-user statistics.
 
-Polubienia są polimorficzne (post / comment) i adresowane po **public UUID**
-obiektu (spójnie z resztą API v1). Wewnątrz tłumaczymy UUID → wewnętrzne int id.
+Likes are polymorphic (post / comment) and addressed by the target's public
+UUID (consistent with the rest of API v1); internally we translate UUID to the
+integer primary key.
 
-Endpointy:
-* ``POST   /api/v1/{posts,comments}/{public_id}/like``  → polub (idempotentne)
-* ``DELETE /api/v1/{posts,comments}/{public_id}/like``  → cofnij polubienie
-* ``GET    /api/v1/{posts,comments}/{public_id}/likes`` → {count, liked}
-* ``GET    /api/v1/users/{user_id}/stats``              → statystyki (widok DB)
+Endpoints:
+* ``POST   /api/v1/{posts,comments}/{public_id}/like``  -> like (idempotent)
+* ``DELETE /api/v1/{posts,comments}/{public_id}/like``  -> unlike
+* ``GET    /api/v1/{posts,comments}/{public_id}/likes`` -> {count, liked}
+* ``GET    /api/v1/users/{user_id}/stats``              -> stats (DB view)
 """
 
 from __future__ import annotations
@@ -17,11 +18,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.modules.files.presentation.deps import OptionalCurrentUser
 from app.modules.identity.presentation.deps import CurrentUser
 from app.shared.presentation.deps import DbSession
-
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ class LikeStateResponse(BaseModel):
 
 
 class MostLikedResponse(BaseModel):
-    """Najpopularniejszy wątek (po liczbie polubień). ``post_id`` = None gdy brak."""
+    """Most popular thread (by like count). ``post_id`` is None when empty."""
 
     post_id: UUID | None = None
     likes: int = 0
@@ -52,12 +53,12 @@ class UserStatsResponse(BaseModel):
 _TABLE = {"post": "posts", "comment": "comments"}
 
 
-def _resolve_target_id(db, target_type: str, public_id: UUID) -> int:
-    """UUID publiczne → wewnętrzne int id (404 gdy brak / usunięty)."""
+def _resolve_target_id(db: Session, target_type: str, public_id: UUID) -> int:
+    """Public UUID -> internal int id (404 when missing / deleted)."""
     table = _TABLE[target_type]
     row = db.execute(
         text(
-            f"SELECT id FROM {table} "  # noqa: S608 - target_type z whitelisty
+            f"SELECT id FROM {table} "  # noqa: S608 - target_type from whitelist
             "WHERE public_id = :pid AND is_deleted = false"
         ),
         {"pid": str(public_id)},
@@ -67,17 +68,21 @@ def _resolve_target_id(db, target_type: str, public_id: UUID) -> int:
     return int(row[0])
 
 
-def _user_int_id(db, public_id: UUID) -> int:
+def _user_int_id(db: Session, public_id: UUID) -> int:
     row = db.execute(
         text("SELECT id FROM users WHERE public_id = :pid"),
         {"pid": str(public_id)},
     ).first()
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     return int(row[0])
 
 
-def _like_state(db, target_type: str, target_id: int, user_int_id: int | None) -> LikeStateResponse:
+def _like_state(
+    db: Session, target_type: str, target_id: int, user_int_id: int | None
+) -> LikeStateResponse:
     count = db.execute(
         text(
             "SELECT COUNT(*) FROM reactions "
@@ -105,10 +110,12 @@ def _like_state(db, target_type: str, target_id: int, user_int_id: int | None) -
 # --------------------------------------------------------------------------- #
 
 
-def _add_like(db, target_type: str, public_id: UUID, user: CurrentUser) -> LikeStateResponse:
+def _add_like(
+    db: Session, target_type: str, public_id: UUID, user: CurrentUser
+) -> LikeStateResponse:
     target_id = _resolve_target_id(db, target_type, public_id)
     uid = _user_int_id(db, user.public_id)
-    # ON CONFLICT DO NOTHING → idempotentne (podwójny like nie powiela)
+    # ON CONFLICT DO NOTHING -> idempotent (double like does not duplicate)
     db.execute(
         text(
             "INSERT INTO reactions (user_id, target_type, target_id) "
@@ -121,7 +128,9 @@ def _add_like(db, target_type: str, public_id: UUID, user: CurrentUser) -> LikeS
     return _like_state(db, target_type, target_id, uid)
 
 
-def _remove_like(db, target_type: str, public_id: UUID, user: CurrentUser) -> LikeStateResponse:
+def _remove_like(
+    db: Session, target_type: str, public_id: UUID, user: CurrentUser
+) -> LikeStateResponse:
     target_id = _resolve_target_id(db, target_type, public_id)
     uid = _user_int_id(db, user.public_id)
     db.execute(
@@ -135,7 +144,9 @@ def _remove_like(db, target_type: str, public_id: UUID, user: CurrentUser) -> Li
     return _like_state(db, target_type, target_id, uid)
 
 
-def _read_likes(db, target_type: str, public_id: UUID, user: OptionalCurrentUser) -> LikeStateResponse:
+def _read_likes(
+    db: Session, target_type: str, public_id: UUID, user: OptionalCurrentUser
+) -> LikeStateResponse:
     target_id = _resolve_target_id(db, target_type, public_id)
     uid = _user_int_id(db, user.public_id) if user else None
     return _like_state(db, target_type, target_id, uid)
@@ -155,7 +166,9 @@ def unlike_post(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateR
 
 
 @router.get("/posts/{public_id}/likes", response_model=LikeStateResponse)
-def post_likes(public_id: UUID, db: DbSession, user: OptionalCurrentUser) -> LikeStateResponse:
+def post_likes(
+    public_id: UUID, db: DbSession, user: OptionalCurrentUser
+) -> LikeStateResponse:
     return _read_likes(db, "post", public_id, user)
 
 
@@ -163,27 +176,28 @@ def post_likes(public_id: UUID, db: DbSession, user: OptionalCurrentUser) -> Lik
 
 
 @router.post("/comments/{public_id}/like", response_model=LikeStateResponse)
-def like_comment(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateResponse:
+def like_comment(
+    public_id: UUID, db: DbSession, user: CurrentUser
+) -> LikeStateResponse:
     return _add_like(db, "comment", public_id, user)
 
 
 @router.delete("/comments/{public_id}/like", response_model=LikeStateResponse)
-def unlike_comment(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateResponse:
+def unlike_comment(
+    public_id: UUID, db: DbSession, user: CurrentUser
+) -> LikeStateResponse:
     return _remove_like(db, "comment", public_id, user)
 
 
 @router.get("/comments/{public_id}/likes", response_model=LikeStateResponse)
-def comment_likes(public_id: UUID, db: DbSession, user: OptionalCurrentUser) -> LikeStateResponse:
+def comment_likes(
+    public_id: UUID, db: DbSession, user: OptionalCurrentUser
+) -> LikeStateResponse:
     return _read_likes(db, "comment", public_id, user)
 
 
 # --------------------------------------------------------------------------- #
-# User stats (widok DB user_stats)                                            #
-# --------------------------------------------------------------------------- #
-
-
-# --------------------------------------------------------------------------- #
-# Featured (najczęściej polubiony) wątek                                       #
+# Featured (most-liked) thread                                                #
 # --------------------------------------------------------------------------- #
 
 
@@ -192,10 +206,10 @@ def featured_post(
     db: DbSession,
     category_id: UUID | None = None,
 ) -> MostLikedResponse:
-    """Wątek z największą liczbą polubień (opcjonalnie w obrębie kategorii).
+    """Thread with the most likes (optionally within a category).
 
-    Ścieżka celowo nie jest pod ``/posts/...`` aby uniknąć kolizji z trasą
-    ``GET /posts/{id}`` modułu content.
+    The path is deliberately not under ``/posts/...`` to avoid colliding with
+    the content module's ``GET /posts/{id}`` route.
     """
     params: dict[str, str] = {}
     cat_clause = ""
@@ -208,11 +222,11 @@ def featured_post(
 
     row = db.execute(
         text(
-            "SELECT p.public_id, COUNT(r.id) AS likes "
+            "SELECT p.public_id, COUNT(r.id) AS likes "  # noqa: S608 - cat_clause is static
             "FROM posts p "
             "LEFT JOIN reactions r "
             "  ON r.target_type = 'post' AND r.target_id = p.id "
-            f"WHERE p.is_deleted = false {cat_clause} "  # noqa: S608 - cat_clause stały
+            f"WHERE p.is_deleted = false {cat_clause} "
             "GROUP BY p.public_id, p.created_at "
             "ORDER BY likes DESC, p.created_at DESC "
             "LIMIT 1"
@@ -222,6 +236,11 @@ def featured_post(
     if row is None:
         return MostLikedResponse(post_id=None, likes=0)
     return MostLikedResponse(post_id=UUID(str(row[0])), likes=int(row[1]))
+
+
+# --------------------------------------------------------------------------- #
+# User stats (DB view user_stats)                                             #
+# --------------------------------------------------------------------------- #
 
 
 @router.get("/users/{user_id}/stats", response_model=UserStatsResponse)
@@ -234,14 +253,18 @@ def user_stats(user_id: UUID, db: DbSession) -> UserStatsResponse:
         {"pid": str(user_id)},
     ).first()
     if row is None:
-        # user istnieje, ale brak wiersza w widoku = zero aktywności; rozróżnij 404
+        # User exists but has no row in the view = zero activity; distinguish 404.
         exists = db.execute(
             text("SELECT 1 FROM users WHERE public_id = :pid"),
             {"pid": str(user_id)},
         ).first()
         if exists is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        return UserStatsResponse(posts_count=0, comments_count=0, likes_received=0)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        return UserStatsResponse(
+            posts_count=0, comments_count=0, likes_received=0
+        )
     return UserStatsResponse(
         posts_count=int(row[0]),
         comments_count=int(row[1]),

@@ -11,8 +11,8 @@ the caller reconstructs the tree using ``depth``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Callable
 from uuid import UUID
 
 from sqlalchemy import select
@@ -35,7 +35,6 @@ from app.modules.content.infrastructure.mappers import (
     comment_summary_from_row,
 )
 from app.modules.content.infrastructure.orm import CommentOrm, PostOrm
-
 
 UserIdResolver = Callable[[UUID], int | None]
 
@@ -103,7 +102,67 @@ class SqlAlchemyCommentRepository(ICommentRepository):
             .where(CommentOrm.post_id == post_db_id)
             .order_by(CommentOrm.path.asc(), CommentOrm.created_at.asc())
         ).all()
-        return [self._project_summary(r) for r in rows]
+        if not rows:
+            return []
+
+        # The post public_id is constant for the whole tree — resolve it once
+        # instead of per comment (was one query per row in _project_summary).
+        post_public_id_value = self._session.scalar(
+            select(PostOrm.public_id).where(PostOrm.id == post_db_id)
+        )
+        if post_public_id_value is None:
+            from uuid import uuid4
+
+            post_public_id_value = uuid4()
+
+        # parent db id -> parent public_id, resolved in a single IN(...) query.
+        parent_db_ids = {
+            r.parent_id for r in rows if r.parent_id is not None
+        }
+        parent_public_ids: dict[int, UUID] = {}
+        if parent_db_ids:
+            for cid, public_id in self._session.execute(
+                select(CommentOrm.id, CommentOrm.public_id).where(
+                    CommentOrm.id.in_(parent_db_ids)
+                )
+            ).all():
+                parent_public_ids[cid] = public_id
+
+        # author db id -> AuthorSummary, resolved in a single IN(...) query.
+        author_db_ids = {
+            r.author_id for r in rows if r.author_id is not None
+        }
+        authors: dict[int, AuthorSummary] = {}
+        if author_db_ids:
+            for uid, public_id, username in self._session.execute(
+                select(
+                    UserOrm.id, UserOrm.public_id, UserOrm.username
+                ).where(UserOrm.id.in_(author_db_ids))
+            ).all():
+                authors[uid] = AuthorSummary(
+                    public_id=public_id, username=username
+                )
+
+        return [
+            comment_summary_from_row(
+                r,
+                post_public_id=post_public_id_value,
+                parent_public_id=(
+                    parent_public_ids.get(r.parent_id)
+                    if r.parent_id is not None
+                    else None
+                ),
+                author=(
+                    authors.get(
+                        r.author_id,
+                        AuthorSummary(public_id=None, username=None),
+                    )
+                    if r.author_id is not None
+                    else AuthorSummary(public_id=None, username=None)
+                ),
+            )
+            for r in rows
+        ]
 
     # --- write -------------------------------------------------------------
 
@@ -203,8 +262,8 @@ class SqlAlchemyCommentRepository(ICommentRepository):
             )
 
         # Attach as plain attributes to avoid extending the mapper signature.
-        setattr(row, "_post_public_id", post_public_id)
-        setattr(row, "_parent_public_id", parent_public_id)
+        row._post_public_id = post_public_id
+        row._parent_public_id = parent_public_id
 
         return comment_from_orm(row, author_public_id=author_public_id)
 

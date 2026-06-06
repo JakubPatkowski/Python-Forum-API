@@ -6,19 +6,23 @@ metadata:
 data:
   # Driver: psycopg3 — must match the package installed in pyproject.toml.
   DATABASE_URL: "postgresql+psycopg://postgres:postgres@postgres-service:5432/forum_wedkarskie"
-  # NOTE: SECRET_KEY belongs in a Secret, not a ConfigMap. Kept here only
-  # for the initial bootstrap; phase 1 will move it to backend-secrets.
-  SECRET_KEY: "change-me-via-secret"
+  # NOTE: SECRET_KEY is intentionally NOT here. It is a credential and lives in
+  # the `backend-secrets` Secret (see k8s/backend/secret.example.yaml and the
+  # `secretRef` in deployment.yaml). Generate it with `openssl rand -hex 64`.
   DEBUG: "false"
   UPLOAD_DIR: "/app/uploads"
   MAX_UPLOAD_SIZE_BYTES: "26214400"
   MAX_COMMENT_DEPTH: "5"
+  # Refresh-cookie hardening: set to "true" only when the app is served over
+  # HTTPS (e.g. behind an ingress with TLS). Over plain HTTP it must stay
+  # "false" or browsers drop the cookie.
+  REFRESH_COOKIE_SECURE: "false"
   # --- MinIO -----------------------------------------------------------------
   # In-cluster endpoint the backend uses for all server-side object ops.
   MINIO_ENDPOINT: "minio-service:9000"
   # Endpoint embedded in presigned URLs (must be reachable by the BROWSER).
-  # Replace <minikube-ip> with the output of `minikube ip` (NodePort 30900),
-  # or point it at an ingress host for MinIO.
+  # Replace <minikube-ip> with the output of `minikube ip` (NodePort 30900).
+  # scripts/deploy.ps1 substitutes this automatically on each deploy.
   MINIO_PUBLIC_ENDPOINT: "<minikube-ip>:30900"
   MINIO_BUCKET: "forum-files"
   MINIO_SECURE: "false"

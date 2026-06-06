@@ -1,0 +1,63 @@
+# Example alerting rules for the forum backend. The Prometheus Operator picks
+# up PrometheusRule objects in all namespaces (ruleSelectorNilUsesHelmValues:
+# false). Fired alerts show up in Alertmanager and in Grafana (Alerting).
+#
+#   kubectl apply -f k8s/monitoring/prometheus-rules.yaml
+#   Prometheus UI -> Alerts   /   Grafana -> Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: forum-backend-rules
+  namespace: forum-wedkarskie
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
+    release: monitoring
+spec:
+  groups:
+    - name: forum-backend.rules
+      rules:
+        - alert: BackendDown
+          # Fire when there are zero healthy backend scrape targets. Using
+          # max(up)==0 / absent(up) together covers both "target reported down"
+          # and "target disappeared entirely" — `absent(up == 1)` alone breaks
+          # when the series exists with value 0.
+          expr: |
+            (max(up{namespace="forum-wedkarskie", job="backend-service"}) or vector(0)) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Backend has no healthy scrape targets"
+            description: "Prometheus cannot scrape any backend pod for 2 minutes."
+        - alert: BackendHighErrorRate
+          expr: |
+            100 * sum(rate(http_requests_total{namespace="forum-wedkarskie", status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total{namespace="forum-wedkarskie"}[5m])), 1) > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend 5xx error rate above 5%"
+            description: "More than 5% of requests are failing over the last 5 minutes."
+        - alert: BackendHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_highr_seconds_bucket{namespace="forum-wedkarskie"}[5m])) by (le)
+            ) > 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend p95 latency above 1s"
+            description: "95th percentile request latency has exceeded 1 second for 5 minutes."
+        - alert: BackendHPAMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="forum-wedkarskie", horizontalpodautoscaler="backend"}
+            >= kube_horizontalpodautoscaler_spec_max_replicas{namespace="forum-wedkarskie", horizontalpodautoscaler="backend"}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend HPA at max replicas"
+            description: "The backend is running at its maximum replica count — consider raising maxReplicas."

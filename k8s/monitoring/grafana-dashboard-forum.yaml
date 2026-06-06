@@ -1,0 +1,187 @@
+# A custom Grafana dashboard "Forum Overview". The Grafana sidecar in
+# kube-prometheus-stack auto-imports any ConfigMap labelled
+# `grafana_dashboard: "1"` (searchNamespace: ALL), so applying this is enough —
+# no manual import. It uses two datasource variables (Prometheus + Loki) so it
+# binds to whatever those datasources are named in your Grafana.
+#
+#   kubectl apply -f k8s/monitoring/grafana-dashboard-forum.yaml
+#   (Grafana -> Dashboards -> "Forum Overview")
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-forum
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: forum-wedkarskie
+data:
+  forum-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "graphTooltip": 1,
+      "time": { "from": "now-30m", "to": "now" },
+      "refresh": "10s",
+      "title": "Forum Overview",
+      "uid": "forum-overview",
+      "schemaVersion": 39,
+      "tags": ["forum-wedkarskie"],
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "label": "Prometheus",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+            "regex": "",
+            "hide": 0
+          },
+          {
+            "name": "loki",
+            "label": "Loki",
+            "type": "datasource",
+            "query": "loki",
+            "current": { "selected": false, "text": "Loki", "value": "Loki" },
+            "regex": "",
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Request rate (req/s)",
+          "description": "Total HTTP requests per second served by the backend across all pods. Source: prometheus-fastapi-instrumentator (http_requests_total).",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(http_requests_total{namespace=\"forum-wedkarskie\"}[1m]))" }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Error rate (5xx %)",
+          "description": "Share of requests returning a 5xx status over the last 5 minutes. Green < 1%, yellow 1-5%, red > 5%. Denominator is clamped to >= 1 req/s so the panel reads 0 instead of NaN when idle.",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "decimals": 2,
+              "thresholds": { "mode": "absolute", "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 5 }
+              ] }
+            },
+            "overrides": []
+          },
+          "targets": [
+            { "refId": "A", "expr": "100 * (sum(rate(http_requests_total{namespace=\"forum-wedkarskie\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_requests_total{namespace=\"forum-wedkarskie\"}[5m])), 1)" }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "p95 latency",
+          "description": "95th-percentile request duration over the last 5 minutes (95% of requests finish faster than this). Computed from the high-resolution histogram buckets exposed by the instrumentator.",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))" }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Backend replicas (HPA)",
+          "description": "Current number of backend pods as reported by the HorizontalPodAutoscaler. Source: kube-state-metrics (kube_horizontalpodautoscaler_status_current_replicas).",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 0, "color": { "mode": "thresholds" } }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "expr": "max(kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"})" }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Request rate by handler",
+          "description": "Requests per second broken down by route template and HTTP method. Useful for spotting which endpoints carry the load. Series are grouped by (handler, method).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "{{method}} {{handler}}", "expr": "sum(rate(http_requests_total{namespace=\"forum-wedkarskie\"}[1m])) by (handler, method)" }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Latency p50 / p95 / p99",
+          "description": "Request-duration percentiles over a 5-minute window. p50 is the typical experience, p99 is the tail latency seen by the slowest 1% of requests. A widening gap between p50 and p99 signals load or contention.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "p50", "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))" },
+            { "refId": "B", "legendFormat": "p95", "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))" },
+            { "refId": "C", "legendFormat": "p99", "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))" }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Backend CPU usage by pod (cores)",
+          "description": "Per-pod CPU consumed by the backend deployment, in cores (1 = one full vCPU). Source: cAdvisor via kubelet. On minikube the `image` label is empty and `container` label is missing — we select by pod name and cpu=\"total\" to get one series per pod without duplicates.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 3, "custom": { "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "{{pod}}", "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"forum-wedkarskie\",pod=~\"backend-.*\",cpu=\"total\"}[1m])) by (pod)" }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Backend memory (working set) by pod",
+          "description": "Per-pod working-set memory of the backend deployment (resident memory minus reclaimable cache — this is what the OOM killer watches). Source: cAdvisor via kubelet. On minikube the `image` label is empty — we select by pod name only and sum by pod to collapse multiple cgroup entries into one series.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "{{pod}}", "expr": "sum(container_memory_working_set_bytes{namespace=\"forum-wedkarskie\",pod=~\"backend-.*\"}) by (pod)" }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Backend replicas: current vs desired (HPA)",
+          "description": "HPA scaling over time: current replicas, the replica count the autoscaler wants (desired), and how many pods are actually Ready. Divergence between desired and ready shows scale-up lag. Source: kube-state-metrics.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 0, "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter" } }, "overrides": [] },
+          "targets": [
+            { "refId": "A", "legendFormat": "current", "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}" },
+            { "refId": "B", "legendFormat": "desired", "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}" },
+            { "refId": "C", "legendFormat": "ready pods", "expr": "kube_deployment_status_replicas_available{namespace=\"forum-wedkarskie\",deployment=\"backend\"}" }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "logs",
+          "title": "Backend logs (Loki)",
+          "description": "Live structured logs from every pod in the forum-wedkarskie namespace, newest first. Source: Loki (promtail/Loki stack). Click a line to expand structured fields.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "type": "loki", "uid": "${loki}" },
+          "options": { "showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" },
+          "targets": [
+            { "refId": "A", "expr": "{namespace=\"forum-wedkarskie\"}" }
+          ]
+        }
+      ]
+    }

@@ -30,5 +30,5 @@ class TagResponse(BaseModel):
     slug: str
 
     @classmethod
-    def from_domain(cls, t: Tag) -> "TagResponse":
+    def from_domain(cls, t: Tag) -> TagResponse:
         return cls(id=t.id.value, name=t.name, slug=str(t.slug))

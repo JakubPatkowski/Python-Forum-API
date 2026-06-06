@@ -36,8 +36,9 @@ def postgres_url() -> str:
 
 @pytest.fixture(scope="module")
 def app(postgres_url: str):
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", postgres_url)

@@ -9,8 +9,8 @@ the listing onto the dedicated ``v_posts_with_stats`` view.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import datetime
-from typing import Callable
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -43,7 +43,6 @@ from app.modules.content.infrastructure.orm import (
     PostTagOrm,
     TagOrm,
 )
-
 
 UserIdResolver = Callable[[UUID], int | None]
 
@@ -152,7 +151,7 @@ class SqlAlchemyPostRepository(IPostRepository):
         if len(rows) > limit:
             rows = rows[:limit]
 
-        summaries = tuple(self._project_summary(row) for row in rows)
+        summaries = self._project_summaries_batch(rows)
         if len(summaries) == limit:
             tail = summaries[-1]
             next_cursor = PostCursor(
@@ -169,7 +168,11 @@ class SqlAlchemyPostRepository(IPostRepository):
             raise ValueError(
                 f"Unknown author {entity.author_id.value} — user must exist first"
             )
-        category_db_id = self._resolve_category_id(entity.category_id.value) if entity.category_id else None
+        category_db_id = (
+            self._resolve_category_id(entity.category_id.value)
+            if entity.category_id
+            else None
+        )
         if entity.category_id and category_db_id is None:
             raise ValueError(
                 f"Unknown category {entity.category_id.value} — must exist first"
@@ -259,6 +262,89 @@ class SqlAlchemyPostRepository(IPostRepository):
             author_public_id=author_public_id,
         )
 
+    def _project_summaries_batch(
+        self, rows: Sequence[PostOrm]
+    ) -> tuple[PostSummary, ...]:
+        """Project a page of posts using a fixed, small number of queries.
+
+        Building the per-row :class:`PostSummary` projection naively issues
+        roughly five queries *per post* (author, category, tag list, comment
+        count). For a 20-item page that is ~100 round-trips. Here we collect
+        the foreign keys once and resolve every relation with a handful of
+        ``IN (...)`` / ``GROUP BY`` queries, then assemble the summaries in
+        memory. The output is identical to :meth:`_project_summary`.
+        """
+        if not rows:
+            return ()
+
+        author_ids = {r.author_id for r in rows if r.author_id is not None}
+        category_ids = {
+            r.category_id for r in rows if r.category_id is not None
+        }
+        post_ids = [r.id for r in rows]
+
+        # --- authors: id -> AuthorSummary -------------------------------------
+        authors: dict[int, AuthorSummary] = {}
+        if author_ids:
+            for uid, public_id, username in self._session.execute(
+                select(
+                    UserOrm.id, UserOrm.public_id, UserOrm.username
+                ).where(UserOrm.id.in_(author_ids))
+            ).all():
+                authors[uid] = AuthorSummary(
+                    public_id=public_id, username=username
+                )
+
+        # --- categories: id -> CategorySummary --------------------------------
+        categories: dict[int, CategorySummary] = {}
+        if category_ids:
+            for cat_row in self._session.scalars(
+                select(CategoryOrm).where(CategoryOrm.id.in_(category_ids))
+            ).all():
+                if cat_row.public_id is not None and cat_row.slug is not None:
+                    categories[cat_row.id] = category_summary_from_orm(cat_row)
+
+        # --- tags: post_id -> tuple[TagSummary, ...] (ordered by name) --------
+        tags_by_post: dict[int, list[TagSummary]] = {pid: [] for pid in post_ids}
+        for post_id, tag_row in self._session.execute(
+            select(PostTagOrm.post_id, TagOrm)
+            .join(TagOrm, TagOrm.id == PostTagOrm.tag_id)
+            .where(PostTagOrm.post_id.in_(post_ids))
+            .order_by(PostTagOrm.post_id, TagOrm.name)
+        ).all():
+            tags_by_post[post_id].append(tag_summary_from_orm(tag_row))
+
+        # --- comment counts: post_id -> int -----------------------------------
+        # ``is_deleted`` may be NULL on legacy rows (pre-0004); treat as live.
+        counts_by_post: dict[int, int] = {pid: 0 for pid in post_ids}
+        for post_id, count in self._session.execute(
+            select(CommentOrm.post_id, func.count(CommentOrm.id))
+            .where(
+                CommentOrm.post_id.in_(post_ids),
+                or_(
+                    CommentOrm.is_deleted.is_(False),
+                    CommentOrm.is_deleted.is_(None),
+                ),
+            )
+            .group_by(CommentOrm.post_id)
+        ).all():
+            counts_by_post[post_id] = int(count)
+
+        return tuple(
+            post_summary_from_row(
+                row,
+                author=authors.get(
+                    row.author_id, AuthorSummary(public_id=None, username=None)
+                ),
+                category=categories.get(row.category_id)
+                if row.category_id is not None
+                else None,
+                tags=tuple(tags_by_post.get(row.id, ())),
+                comment_count=counts_by_post.get(row.id, 0),
+            )
+            for row in rows
+        )
+
     def _project_summary(self, row: PostOrm) -> PostSummary:
         # Author summary
         author_row = self._session.execute(
@@ -335,14 +421,13 @@ class SqlAlchemyPostRepository(IPostRepository):
         ).all()
         desired_db_ids = {r[0] for r in tag_db_rows}
 
-        existing_db_ids = {
-            r
-            for r in self._session.scalars(
+        existing_db_ids = set(
+            self._session.scalars(
                 select(PostTagOrm.tag_id).where(
                     PostTagOrm.post_id == post_db_id
                 )
             ).all()
-        }
+        )
         # Delete removed links
         to_remove = existing_db_ids - desired_db_ids
         if to_remove:

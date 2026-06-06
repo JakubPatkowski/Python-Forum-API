@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import (
     PostSummary,
     UpdatePostCommand,
@@ -25,6 +21,9 @@ from app.modules.content.domain.value_objects import (
     Slug,
 )
 from app.modules.identity.domain.user import UserId
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class UpdatePostUseCase:
@@ -92,7 +91,7 @@ class UpdatePostUseCase:
             summary = await uow.posts.get_with_summary(post.id)
             events = post.pull_events()
 
-        assert summary is not None  # noqa: S101
+        assert summary is not None
         for event in events:
             await self._bus.publish(event)
         return Ok(summary)

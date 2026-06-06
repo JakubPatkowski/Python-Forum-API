@@ -17,7 +17,6 @@ from app.modules.content.application.commands import (
     UpdatePostCommand,
 )
 
-
 # --------------------------------------------------------------------------- #
 # Request DTOs                                                                #
 # --------------------------------------------------------------------------- #
@@ -91,7 +90,7 @@ class CategoryRefResponse(BaseModel):
     slug: str
 
     @classmethod
-    def from_summary(cls, c: CategorySummary) -> "CategoryRefResponse":
+    def from_summary(cls, c: CategorySummary) -> CategoryRefResponse:
         return cls(public_id=c.public_id, name=c.name, slug=c.slug)
 
 
@@ -101,7 +100,7 @@ class TagRefResponse(BaseModel):
     slug: str
 
     @classmethod
-    def from_summary(cls, t: TagSummary) -> "TagRefResponse":
+    def from_summary(cls, t: TagSummary) -> TagRefResponse:
         return cls(public_id=t.public_id, name=t.name, slug=t.slug)
 
 
@@ -122,7 +121,7 @@ class PostResponse(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_summary(cls, s: PostSummary) -> "PostResponse":
+    def from_summary(cls, s: PostSummary) -> PostResponse:
         return cls(
             id=s.public_id,
             title=s.title,
@@ -152,7 +151,7 @@ class PostListResponse(BaseModel):
     next_cursor: str | None
 
     @classmethod
-    def from_page(cls, p: PostListPage) -> "PostListResponse":
+    def from_page(cls, p: PostListPage) -> PostListResponse:
         return cls(
             items=[PostResponse.from_summary(s) for s in p.items],
             next_cursor=p.next_cursor,

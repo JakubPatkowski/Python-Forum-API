@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.identity.application.commands import (
     AssignRoleCommand,
     RevokeRoleCommand,
@@ -13,6 +9,9 @@ from app.modules.identity.application.commands import (
 from app.modules.identity.application.errors import RoleNotFound, UserNotFound
 from app.modules.identity.application.ports import IIdentityUnitOfWork
 from app.modules.identity.domain.user import UserId
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class AssignRoleUseCase:

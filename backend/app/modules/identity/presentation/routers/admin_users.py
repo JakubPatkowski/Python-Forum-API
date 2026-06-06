@@ -28,7 +28,6 @@ from app.modules.identity.application.commands import (
     SetUserStatusCommand,
     UserSummary,
 )
-from app.modules.identity.application.errors import UserNotFound
 from app.modules.identity.application.use_cases import (
     AssignRoleUseCase,
     DenyPermissionUseCase,
@@ -37,10 +36,6 @@ from app.modules.identity.application.use_cases import (
     SetUserStatusUseCase,
 )
 from app.modules.identity.infrastructure.orm import UserOrm
-from app.shared.application.result import Err
-from app.shared.domain.errors import DomainError
-from app.shared.presentation.deps import DbSession
-
 from app.modules.identity.presentation.deps import requires
 from app.modules.identity.presentation.dto.user_dto import (
     AssignRoleRequest,
@@ -48,12 +43,14 @@ from app.modules.identity.presentation.dto.user_dto import (
     SetStatusRequest,
     UserResponse,
 )
-
+from app.shared.application.result import Err
+from app.shared.domain.errors import DomainError
+from app.shared.presentation.deps import DbSession
 
 router = APIRouter()
 
 
-def _raise_if_error(result) -> None:
+def _raise_if_error(result: object) -> None:
     if isinstance(result, Err):
         if isinstance(result.error, DomainError):
             raise result.error
@@ -99,7 +96,7 @@ async def list_users(
 async def assign_role(
     user_id: UUID,
     body: AssignRoleRequest,
-    user: Annotated["object", Depends(requires("role.manage"))],
+    user: Annotated[object, Depends(requires("role.manage"))],
     uc: Annotated[AssignRoleUseCase, Depends(get_assign_role_uc)],
 ) -> None:
     result = await uc.execute(
@@ -121,7 +118,7 @@ async def assign_role(
 async def revoke_role(
     user_id: UUID,
     role_name: str,
-    user: Annotated["object", Depends(requires("role.manage"))],
+    user: Annotated[object, Depends(requires("role.manage"))],
     uc: Annotated[RevokeRoleUseCase, Depends(get_revoke_role_uc)],
 ) -> None:
     result = await uc.execute(
@@ -143,7 +140,7 @@ async def revoke_role(
 async def set_permission_override(
     user_id: UUID,
     body: GrantPermissionRequest,
-    user: Annotated["object", Depends(requires("role.manage"))],
+    user: Annotated[object, Depends(requires("role.manage"))],
     grant_uc: Annotated[GrantPermissionUseCase, Depends(get_grant_permission_uc)],
     deny_uc: Annotated[DenyPermissionUseCase, Depends(get_deny_permission_uc)],
 ) -> None:
@@ -176,7 +173,7 @@ async def set_permission_override(
 async def set_status(
     user_id: UUID,
     body: SetStatusRequest,
-    user: Annotated["object", Depends(requires("user.manage"))],
+    user: Annotated[object, Depends(requires("user.manage"))],
     uc: Annotated[SetUserStatusUseCase, Depends(get_set_user_status_uc)],
 ) -> None:
     result = await uc.execute(
@@ -206,9 +203,9 @@ def _row_to_response(db: Session, row: UserOrm) -> UserResponse:
 
     repo = SqlAlchemyUserRepository(db)
     # We deliberately call internal helpers here for cheap projection.
-    roles = repo._load_user_roles(row.id)  # noqa: SLF001 - intentional shortcut
-    granted, denied = repo._load_user_overrides(row.id)  # noqa: SLF001
-    perms = set()
+    roles = repo._load_user_roles(row.id)
+    granted, denied = repo._load_user_overrides(row.id)
+    perms: set[str] = set()
     for r in roles:
         perms.update(p.code for p in r.permissions)
     perms.update(granted)

@@ -1,0 +1,34 @@
+# SAFE DEFAULT NetworkPolicy — applied by scripts/deploy.ps1.
+#
+# Effect: the database accepts connections ONLY from backend pods (the
+# Deployment plus the migrate / cleanup / create-bucket Jobs, which all carry
+# `app: backend`). Every other pod is denied. This is the single most valuable
+# policy for the demo: "the DB is not reachable from anywhere but the API".
+#
+# IMPORTANT: NetworkPolicies are enforced only by a policy-capable CNI. The
+# minikube default (kindnet/bridge) IGNORES them. To actually enforce, start
+# minikube with Calico:
+#     minikube start --cni=calico
+# Verify enforcement with the test in docs/12 (a debug pod that fails to reach
+# postgres but the backend still can).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-backend
+  namespace: forum-wedkarskie
+  labels:
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 5432

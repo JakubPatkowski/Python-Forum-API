@@ -61,7 +61,7 @@ class SqlAlchemyContentUnitOfWork(IContentUnitOfWork):
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        assert self._session is not None  # noqa: S101
+        assert self._session is not None
         try:
             if exc_type is not None:
                 self._session.rollback()
@@ -71,11 +71,11 @@ class SqlAlchemyContentUnitOfWork(IContentUnitOfWork):
             self._user_id_cache.clear()
 
     async def commit(self) -> None:
-        assert self._session is not None, "UoW must be entered before commit"  # noqa: S101
+        assert self._session is not None, "UoW must be entered before commit"
         self._session.commit()
 
     async def rollback(self) -> None:
-        assert self._session is not None, "UoW must be entered before rollback"  # noqa: S101
+        assert self._session is not None, "UoW must be entered before rollback"
         self._session.rollback()
 
     async def resolve_user_id(self, user_public_id: UUID) -> int | None:
@@ -89,7 +89,7 @@ class SqlAlchemyContentUnitOfWork(IContentUnitOfWork):
         cached = self._user_id_cache.get(user_public_id)
         if cached is not None:
             return cached
-        assert self._session is not None  # noqa: S101
+        assert self._session is not None
         db_id = self._session.scalar(
             select(UserOrm.id).where(UserOrm.public_id == user_public_id)
         )

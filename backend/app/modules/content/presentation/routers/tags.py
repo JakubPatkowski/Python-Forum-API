@@ -15,15 +15,14 @@ from app.modules.content.presentation.dto import (
     CreateTagRequest,
     TagResponse,
 )
-from app.modules.identity.presentation.deps import requires
+from app.modules.identity.presentation.deps import CurrentUserData, requires
 from app.shared.application.result import Err
 from app.shared.domain.errors import DomainError
-
 
 router = APIRouter()
 
 
-def _raise_if_error(result) -> None:
+def _raise_if_error(result: object) -> None:
     if isinstance(result, Err):
         if isinstance(result.error, DomainError):
             raise result.error
@@ -54,7 +53,7 @@ async def list_tags(
 )
 async def create_tag(
     body: CreateTagRequest,
-    _user=Depends(requires("tag.manage")),
+    _user: CurrentUserData = Depends(requires("tag.manage")),
     uc: CreateTagUseCase = Depends(get_create_tag_uc),
 ) -> TagResponse:
     result = await uc.execute(body.to_command())

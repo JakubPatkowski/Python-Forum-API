@@ -35,7 +35,7 @@ class PostCursor:
         return base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
 
     @classmethod
-    def decode(cls, cursor: str) -> "PostCursor":
+    def decode(cls, cursor: str) -> PostCursor:
         try:
             # Re-pad for base64 length compatibility.
             padding = "=" * (-len(cursor) % 4)

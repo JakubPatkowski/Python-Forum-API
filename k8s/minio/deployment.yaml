@@ -3,6 +3,10 @@ kind: Deployment
 metadata:
   name: minio
   namespace: forum-wedkarskie
+  labels:
+    app: minio
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: forum-wedkarskie
 spec:
   replicas: 1
   selector:
@@ -14,10 +18,20 @@ spec:
     metadata:
       labels:
         app: minio
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/part-of: forum-wedkarskie
     spec:
+      # MinIO is kept as the image default user to avoid changing ownership of
+      # an existing data volume. It still gets the safe hardening below.
+      # To run fully non-root, add `runAsNonRoot: true`, `runAsUser: 1000`
+      # and `fsGroup: 1000` on a FRESH volume (see docs/12).
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: minio
-          image: minio/minio:latest
+          # Pinned release tag (not :latest) for deterministic deploys.
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
           args: ["server", "/data", "--console-address", ":9001"]
           envFrom:
             - secretRef:
@@ -33,15 +47,19 @@ spec:
           readinessProbe:
             httpGet:
               path: /minio/health/ready
-              port: 9000
+              port: s3
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /minio/health/live
-              port: 9000
+              port: s3
             initialDelaySeconds: 15
             periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: "100m"

@@ -6,14 +6,17 @@ from sqlalchemy import (
     BigInteger,
     Column,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import INET, UUID as SQL_UUID
+from sqlalchemy import (
+    Enum as SAEnum,
+)
+from sqlalchemy.dialects.postgresql import INET
+from sqlalchemy.dialects.postgresql import UUID as SQL_UUID
 from sqlalchemy.sql import func
 
 from app.shared.infrastructure.db import Base

@@ -14,8 +14,6 @@ from types import TracebackType
 from typing import Protocol, Self
 from uuid import UUID
 
-from app.shared.application.repository import IRepository
-
 from app.modules.content.application.commands import (
     CategorySummary,
     CommentSummary,
@@ -26,6 +24,7 @@ from app.modules.content.domain.category import Category, CategoryId
 from app.modules.content.domain.comment import Comment, CommentId
 from app.modules.content.domain.post import Post, PostId
 from app.modules.content.domain.tag import Tag, TagId
+from app.shared.application.repository import IRepository
 
 # --------------------------------------------------------------------------- #
 # Repositories                                                                #

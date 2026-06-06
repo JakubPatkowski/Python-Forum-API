@@ -31,9 +31,6 @@ from app.modules.identity.application.use_cases import (
     RefreshSessionUseCase,
     RegisterUserUseCase,
 )
-from app.shared.application.result import Err
-from app.shared.domain.errors import DomainError
-
 from app.modules.identity.presentation.deps import (
     CurrentUser,
     client_ip,
@@ -45,12 +42,13 @@ from app.modules.identity.presentation.dto.auth_dto import (
     TokenResponse,
 )
 from app.modules.identity.presentation.dto.user_dto import UserResponse
-
+from app.shared.application.result import Err
+from app.shared.domain.errors import DomainError
 
 router = APIRouter()
 
 
-def _raise_if_error(result) -> None:
+def _raise_if_error(result: object) -> None:
     if isinstance(result, Err):
         # ``DomainError`` is handled by the global handler; re-raise as-is.
         if isinstance(result.error, DomainError):
@@ -139,7 +137,7 @@ async def refresh(
     if token is None:
         try:
             body = await request.json()
-        except Exception:  # noqa: BLE001 - missing body is fine
+        except Exception:
             body = None
         if isinstance(body, dict):
             token = body.get("refresh_token")

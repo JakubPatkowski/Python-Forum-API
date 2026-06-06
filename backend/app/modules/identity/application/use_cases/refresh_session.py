@@ -13,10 +13,6 @@ Workflow per ``docs/03-security.md`` §2.3:
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.identity.application.commands import (
     RefreshSessionCommand,
     TokenPair,
@@ -32,10 +28,16 @@ from app.modules.identity.application.ports import (
 )
 from app.modules.identity.domain.events import (
     RefreshTokenIssued,
-    RefreshTokenReuseDetected as RefreshTokenReuseDetectedEvent,
     RefreshTokenRotated,
 )
+from app.modules.identity.domain.events import (
+    RefreshTokenReuseDetected as RefreshTokenReuseDetectedEvent,
+)
 from app.modules.identity.domain.refresh_token import TokenStatus
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
+from app.shared.domain.events import DomainEvent
 
 
 class RefreshSessionUseCase:
@@ -58,7 +60,7 @@ class RefreshSessionUseCase:
         if claims is None:
             return Err(InvalidRefreshToken())
 
-        events_after_commit: list = []
+        events_after_commit: list[DomainEvent] = []
 
         async with self._uow as uow:
             stored = await uow.refresh_tokens.get_by_public_id(claims.token_public_id)

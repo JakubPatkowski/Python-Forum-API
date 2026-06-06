@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import PostSummary
 from app.modules.content.application.errors import PostNotFound
 from app.modules.content.application.ports import IContentUnitOfWork
 from app.modules.content.domain.post import PostId
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class GetPostUseCase:

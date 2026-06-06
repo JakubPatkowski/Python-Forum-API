@@ -84,7 +84,7 @@ class CommentResponse(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_summary(cls, s: CommentSummary) -> "CommentResponse":
+    def from_summary(cls, s: CommentSummary) -> CommentResponse:
         return cls(
             id=s.public_id,
             post_id=s.post_public_id,
@@ -110,5 +110,5 @@ class CommentTreeResponse(BaseModel):
     @classmethod
     def from_summaries(
         cls, items: list[CommentSummary]
-    ) -> "CommentTreeResponse":
+    ) -> CommentTreeResponse:
         return cls(items=[CommentResponse.from_summary(c) for c in items])

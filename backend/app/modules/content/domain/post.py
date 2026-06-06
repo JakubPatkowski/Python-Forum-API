@@ -12,17 +12,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.shared.domain.entity import AggregateRoot
-from app.shared.domain.entity_id import EntityId
-from app.shared.domain.errors import ValidationError
-
 from app.modules.content.domain.category import CategoryId
 from app.modules.content.domain.events import (
     PostCreated,
     PostDeleted,
     PostUpdated,
 )
-from app.modules.content.domain.tag import Tag, TagId
+from app.modules.content.domain.tag import Tag
 from app.modules.content.domain.value_objects import (
     ContentFormat,
     MarkdownContent,
@@ -32,6 +28,9 @@ from app.modules.content.domain.value_objects import (
 # UserId from identity is referenced by UUID only — content doesn't import
 # the User aggregate to keep modules independent.
 from app.modules.identity.domain.user import UserId
+from app.shared.domain.entity import AggregateRoot
+from app.shared.domain.entity_id import EntityId
+from app.shared.domain.errors import ValidationError
 
 
 class PostId(EntityId["Post"]):
@@ -113,7 +112,7 @@ class Post(AggregateRoot[PostId]):
         category_id: CategoryId | None = None,
         tags: set[Tag] | None = None,
         slug: Slug | None = None,
-    ) -> "Post":
+    ) -> Post:
         """Factory for fresh posts. Emits :class:`PostCreated`."""
         cls._validate_title(title)
         derived_slug = slug or Slug.from_text(title)

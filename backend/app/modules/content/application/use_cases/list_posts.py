@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import (
     ListPostsQuery,
     PostListPage,
 )
 from app.modules.content.application.pagination import PostCursor
 from app.modules.content.application.ports import IContentUnitOfWork
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class ListPostsUseCase:

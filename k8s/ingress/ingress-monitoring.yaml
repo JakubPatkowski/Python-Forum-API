@@ -1,0 +1,28 @@
+# OPTIONAL ingress for Grafana at http://grafana.local.
+#
+# Grafana is an admin tool, so you may prefer to keep it on port-forward
+# (scripts/portforward.ps1) rather than exposing it. If you do want it on a
+# host, apply this AND add `<minikube ip> grafana.local` to your hosts file.
+#
+# The service name `monitoring-grafana` assumes the Helm release is named
+# `monitoring` (as in scripts/install-monitoring.ps1). Adjust if you renamed it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grafana.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-grafana
+                port:
+                  number: 80

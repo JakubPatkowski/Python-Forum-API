@@ -19,6 +19,25 @@ from app.shared.domain.value_object import ValueObject
 _SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _SLUG_REPLACE_RE = re.compile(r"[^a-z0-9]+")
 
+# Transliteration for letters NFKD does not decompose to ASCII (notably Polish
+# "ł"/"Ł", which have no canonical decomposition). Applied BEFORE NFKD, so this
+# map only needs the no-decomposition letters; the rest (ó, ą, ę, ć, ń, ś, ź, ż)
+# are handled by NFKD + stripping combining marks. Without this, "Łódź Łowienie"
+# produced "odz-owienie".
+_TRANSLITERATION = str.maketrans(
+    {
+        "ł": "l",
+        "Ł": "L",
+        "ß": "ss",
+        "æ": "ae",
+        "Æ": "AE",
+        "ø": "o",
+        "Ø": "O",
+        "đ": "d",
+        "Đ": "D",
+    }
+)
+
 
 class ContentFormat(StrEnum):
     """Format of a post or comment's ``content`` field."""
@@ -54,13 +73,15 @@ class Slug(ValueObject):
         return self.value
 
     @classmethod
-    def from_text(cls, text: str, *, max_length: int = 120) -> "Slug":
+    def from_text(cls, text: str, *, max_length: int = 120) -> Slug:
         """Build a slug from arbitrary text.
 
-        Strips accents, lower-cases, collapses runs of non-alphanumerics into
+        Transliterates letters with no NFKD decomposition (e.g. Polish "ł"),
+        strips accents, lower-cases, collapses runs of non-alphanumerics into
         a single hyphen, trims leading/trailing hyphens, then truncates.
         """
-        normalised = unicodedata.normalize("NFKD", text)
+        transliterated = text.translate(_TRANSLITERATION)
+        normalised = unicodedata.normalize("NFKD", transliterated)
         ascii_only = "".join(
             ch for ch in normalised if not unicodedata.combining(ch)
         )

@@ -22,7 +22,7 @@ class UserResponse(BaseModel):
     permissions: list[str]
 
     @classmethod
-    def from_summary(cls, summary: UserSummary) -> "UserResponse":
+    def from_summary(cls, summary: UserSummary) -> UserResponse:
         return cls(
             id=summary.public_id,
             username=summary.username,

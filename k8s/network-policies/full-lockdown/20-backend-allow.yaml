@@ -1,0 +1,36 @@
+# Allows inbound to the backend API (port 8000) from exactly four sources:
+#   - the frontend pods (the SPA's nginx reverse-proxy)
+#   - the ingress-nginx controller (so forum.local works)
+#   - the monitoring namespace (so Prometheus can scrape /metrics)
+#   - the in-cluster k6 load generator (app: k6)
+# Everything else is denied by 00-default-deny-ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow
+  namespace: forum-wedkarskie
+  labels:
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend     # the Deployment pods
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+        - podSelector:
+            matchLabels:
+              app: k6
+      ports:
+        - protocol: TCP
+          port: 8000

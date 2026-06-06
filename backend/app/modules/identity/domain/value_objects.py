@@ -59,7 +59,7 @@ class Email(ValueObject):
 
 @dataclass(frozen=True, slots=True)
 class Username(ValueObject):
-    """A user-visible login name. 3–50 characters, ``[A-Za-z0-9_]`` only."""
+    """A user-visible login name. 3-50 characters, ``[A-Za-z0-9_]`` only."""
 
     value: str
 

@@ -8,6 +8,9 @@ kind: CronJob
 metadata:
   name: files-cleanup
   namespace: forum-wedkarskie
+  labels:
+    app: backend
+    component: cleanup
 spec:
   schedule: "0 3 * * *"          # every day at 03:00
   concurrencyPolicy: Forbid
@@ -16,8 +19,19 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            # `app: backend` so the postgres/minio NetworkPolicies allow it.
+            app: backend
+            component: cleanup
         spec:
           restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: files-cleanup
               image: forum-wedkarskie-backend:latest
@@ -27,7 +41,13 @@ spec:
                 - configMapRef:
                     name: backend-config
                 - secretRef:
+                    name: backend-secrets
+                - secretRef:
                     name: minio-secret
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
               resources:
                 requests:
                   cpu: "50m"

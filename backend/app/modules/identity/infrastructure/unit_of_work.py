@@ -48,7 +48,7 @@ class SqlAlchemyIdentityUnitOfWork(IIdentityUnitOfWork):
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        assert self._session is not None  # noqa: S101
+        assert self._session is not None
         try:
             if exc_type is not None:
                 self._session.rollback()
@@ -57,9 +57,9 @@ class SqlAlchemyIdentityUnitOfWork(IIdentityUnitOfWork):
             self._session = None
 
     async def commit(self) -> None:
-        assert self._session is not None, "UoW must be entered before commit"  # noqa: S101
+        assert self._session is not None, "UoW must be entered before commit"
         self._session.commit()
 
     async def rollback(self) -> None:
-        assert self._session is not None, "UoW must be entered before rollback"  # noqa: S101
+        assert self._session is not None, "UoW must be entered before rollback"
         self._session.rollback()

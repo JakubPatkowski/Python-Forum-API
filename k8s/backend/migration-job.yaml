@@ -6,13 +6,13 @@
 # - Failure surfaces clearly in `kubectl get jobs` instead of a CrashLoopBackOff
 #   on every pod.
 #
-# Apply order in scripts/deploy.sh:
+# Apply order (see scripts/deploy.ps1):
 #   1. kubectl apply -f k8s/postgres/
 #   2. kubectl wait pod -l app=postgres --for=condition=ready
 #   3. kubectl delete job backend-migrate --ignore-not-found
 #   4. kubectl apply -f k8s/backend/migration-job.yaml
 #   5. kubectl wait --for=condition=complete job/backend-migrate
-#   6. kubectl apply -f k8s/backend/    # deployment, service, hpa, ...
+#   6. kubectl apply -f k8s/backend/    # deployment, service, hpa, pdb, ...
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,10 +27,18 @@ spec:
   template:
     metadata:
       labels:
+        # `app: backend` makes the postgres NetworkPolicy allow this Job to
+        # reach the database (same source selector as the running pods).
         app: backend
         component: migrate
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: forum-wedkarskie-backend:latest
@@ -39,6 +47,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: backend-config
+            # Settings import validates SECRET_KEY at startup, so the migrate
+            # container needs it too.
+            - secretRef:
+                name: backend-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: "100m"

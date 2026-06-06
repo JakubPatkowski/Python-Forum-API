@@ -18,14 +18,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.identity.application.ports import IUserRepository
+from app.modules.identity.domain.permission import Permission
 from app.modules.identity.domain.role import Role, RoleId
-from app.modules.identity.domain.user import User, UserId, UserStatus
+from app.modules.identity.domain.user import User, UserId
 from app.modules.identity.domain.value_objects import Email, Username
 from app.modules.identity.infrastructure.mappers import (
     status_to_db,
     user_from_orm,
 )
-from app.modules.identity.domain.permission import Permission
 from app.modules.identity.infrastructure.orm import (
     PermissionOrm,
     RoleOrm,
@@ -208,14 +208,13 @@ class SqlAlchemyUserRepository(IUserRepository):
         granted = {p.code for p in user.granted_permissions}
         denied = {p.code for p in user.denied_permissions}
 
-        codes_to_ids = {
-            code: pid
-            for code, pid in self._session.execute(
+        codes_to_ids = dict(
+            self._session.execute(
                 select(PermissionOrm.code, PermissionOrm.id).where(
                     PermissionOrm.code.in_(granted | denied)
                 )
             ).all()
-        }
+        )
 
         # Drop existing overrides and re-insert; small set, simple algorithm.
         self._session.execute(
