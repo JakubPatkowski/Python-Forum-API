@@ -1,0 +1,30 @@
+# Tells the Prometheus Operator to scrape the backend's /metrics endpoint
+# (exposed by prometheus-fastapi-instrumentator in app/main.py).
+#
+# Prometheus discovers this object because the stack is installed with
+# serviceMonitorSelectorNilUsesHelmValues=false and an all-namespaces
+# namespace selector (see values-kube-prometheus-stack.yaml).
+#
+# Verify after install:
+#   Grafana/Prometheus -> Status -> Targets  → "backend" should be UP.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend
+  namespace: forum-wedkarskie
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
+    release: monitoring        # harmless; matches the default Helm release name
+spec:
+  namespaceSelector:
+    matchNames:
+      - forum-wedkarskie
+  selector:
+    matchLabels:
+      app: backend             # matches k8s/backend/service.yaml
+  endpoints:
+    - port: http               # the named Service port
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

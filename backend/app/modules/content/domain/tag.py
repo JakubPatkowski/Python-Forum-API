@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from app.modules.content.domain.value_objects import Slug
 from app.shared.domain.entity import Entity
 from app.shared.domain.entity_id import EntityId
-
-from app.modules.content.domain.value_objects import Slug
 
 
 class TagId(EntityId["Tag"]):
@@ -33,7 +32,7 @@ class Tag(Entity[TagId]):
         return self._slug
 
     @classmethod
-    def create(cls, name: str) -> "Tag":
+    def create(cls, name: str) -> Tag:
         """Build a Tag from raw text, deriving a slug automatically."""
         cleaned = name.strip().lower()
         if not cleaned:

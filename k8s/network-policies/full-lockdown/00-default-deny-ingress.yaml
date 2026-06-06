@@ -1,0 +1,22 @@
+# FULL LOCKDOWN (advanced) — apply the whole `full-lockdown/` folder ONLY
+# together with the safe-default postgres-allow-backend.yaml, and ONLY on a
+# Calico-enabled cluster (`minikube start --cni=calico`).
+#
+# This is a namespace-wide default-deny for INGRESS: once applied, no pod in
+# forum-wedkarskie accepts any inbound traffic unless another policy explicitly
+# allows it (the 20/30/40 files below). Egress stays open, so DNS, outbound DB
+# and MinIO calls keep working without extra rules.
+#
+# Under full lockdown the NodePort fallbacks no longer work — reach the app via
+# the ingress (forum.local) and admin tools via port-forward.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: forum-wedkarskie
+  labels:
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  podSelector: {}        # all pods in the namespace
+  policyTypes:
+    - Ingress

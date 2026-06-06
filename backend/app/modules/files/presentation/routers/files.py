@@ -19,10 +19,8 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import text
-
-from app.shared.presentation.deps import DbSession
 from fastapi.responses import RedirectResponse
+from sqlalchemy import text
 
 from app.container import (
     get_attach_files_uc,
@@ -79,6 +77,7 @@ from app.modules.files.presentation.dto import (
 from app.modules.identity.presentation.deps import CurrentUser, requires
 from app.shared.application.result import Err
 from app.shared.domain.errors import DomainError
+from app.shared.presentation.deps import DbSession
 
 router = APIRouter()
 
@@ -389,7 +388,11 @@ async def get_user_avatar(
     view = result.value  # type: ignore[union-attr]
     if view is None:
         raise HTTPException(status_code=404, detail="No avatar set")
-    target = view.variants[variant].url if variant in view.variants else view.url
+    target = (
+        view.variants[variant].url
+        if variant is not None and variant in view.variants
+        else view.url
+    )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
@@ -455,7 +458,11 @@ async def get_category_image(
     view = result.value  # type: ignore[union-attr]
     if view is None:
         raise HTTPException(status_code=404, detail="No category image set")
-    target = view.variants[variant].url if variant in view.variants else view.url
+    target = (
+        view.variants[variant].url
+        if variant is not None and variant in view.variants
+        else view.url
+    )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
@@ -523,5 +530,9 @@ async def get_post_icon(
     view = result.value  # type: ignore[union-attr]
     if view is None:
         raise HTTPException(status_code=404, detail="No post icon set")
-    target = view.variants[variant].url if variant in view.variants else view.url
+    target = (
+        view.variants[variant].url
+        if variant is not None and variant in view.variants
+        else view.url
+    )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)

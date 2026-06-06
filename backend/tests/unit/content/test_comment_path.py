@@ -11,9 +11,9 @@ from uuid import uuid4
 import pytest
 
 from app.modules.content.domain.comment import (
-    Comment,
     PATH_SEGMENT_WIDTH,
     PATH_SEPARATOR,
+    Comment,
     depth_of_path,
     encode_path_segment,
     path_for,

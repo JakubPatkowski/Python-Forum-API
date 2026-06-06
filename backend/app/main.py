@@ -8,13 +8,12 @@ explicit and testable.
 Boot sequence (in order):
 1. Configure structured logging.
 2. Build FastAPI with title/description/version from settings.
-3. Attach middleware (CORS for now; security headers in phase 7).
+3. Attach middleware (CORS, security headers, upload-size guard).
 4. Register global exception handlers from `shared.presentation`.
 5. Ensure uploads directory exists (mounted as PVC in k8s).
-6. Mount static files for the admin SSR panel.
-7. Include routers — phase-1 ``/api/v1/*`` and legacy ``/api/*``.
-8. Include admin SSR panel under `/admin`.
-9. Wire health-check endpoints.
+6. Include the ``/api/v1/*`` module routers (identity, content, files, engagement).
+7. Wire health-check endpoints (liveness + DB-backed readiness).
+8. Expose Prometheus metrics at ``/metrics``.
 
 `Base.metadata.create_all` is intentionally NOT called anymore — Alembic
 manages the schema (`alembic upgrade head`). For local development without
@@ -28,12 +27,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy import text
 
 from app.config import settings
+from app.shared.infrastructure.db import engine
 from app.shared.infrastructure.logging import configure_logging
 from app.shared.presentation import register_exception_handlers
 from app.shared.presentation.middleware import (
@@ -75,12 +75,15 @@ def create_app() -> FastAPI:
 
     # Step 3 — middleware (LIFO: last added = first executed).
     # 3a. CORS (must be outermost to set headers on preflight).
+    # Methods/headers are restricted to exactly what the SPA uses instead of
+    # the "*" wildcard — this narrows the cross-origin attack surface while
+    # still covering bearer auth (Authorization) and multipart uploads.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ALLOW_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
     )
     # 3b. Security headers (X-Frame-Options, HSTS, CSP, etc.).
     app.add_middleware(SecurityHeadersMiddleware)
@@ -96,11 +99,7 @@ def create_app() -> FastAPI:
     # Step 5 — uploads directory (PVC mount in k8s).
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
-    # Step 6 — static files for the admin SSR panel.
-    static_dir = Path(__file__).resolve().parent / "static"
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
-    # Step 7a — phase-1 identity routers (Clean Architecture, modular monolith).
+    # Step 6 — phase-1 identity routers (Clean Architecture, modular monolith).
     from app.modules.identity.presentation import (
         admin_users_router,
         auth_router,
@@ -143,21 +142,10 @@ def create_app() -> FastAPI:
 
     app.include_router(engagement_router, prefix="/api/v1", tags=["engagement"])
 
-    # Step 7d — legacy admin SSR panel (attachments router removed in phase 3).
-    from app.routers import admin
-
-    # Step 8 — admin SSR panel (excluded from OpenAPI schema).
-    app.include_router(
-        admin.router,
-        prefix="/admin",
-        tags=["admin-panel"],
-        include_in_schema=False,
-    )
-
-    # Step 9 — health-check endpoints.
+    # Step 7 — health-check endpoints.
     _register_health_routes(app)
 
-    # Step 10 — Prometheus metrics (endpoint /metrics).
+    # Step 8 — Prometheus metrics (endpoint /metrics).
     Instrumentator().instrument(app).expose(app)
 
     return app
@@ -180,10 +168,19 @@ def _register_health_routes(app: FastAPI) -> None:
         return {"status": "alive"}
 
     @app.get("/health/ready", tags=["health"])
-    def health_ready() -> dict[str, str]:
-        # TODO(phase 4): check DB and RabbitMQ connectivity.
+    def health_ready(response: Response) -> dict[str, str]:
+        # Readiness gates traffic: a pod that lost its DB must report 503 so
+        # Kubernetes stops routing requests to it (liveness stays green —
+        # the process is fine, only its dependency is down).
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception:
+            logger.warning("readiness_check_failed", exc_info=True)
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            return {"status": "not_ready", "reason": "database_unavailable"}
         return {"status": "ready"}
 
 
-# Module-level ASGI app used by `uvicorn app.main:app` and tests.
-app: FastAPI = create_app()
+# Module-level ASGI app used by `uvicorn app.main:ap
+app = create_app()

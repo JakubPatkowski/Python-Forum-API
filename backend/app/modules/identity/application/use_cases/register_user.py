@@ -10,10 +10,6 @@ Steps:
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.identity.application.commands import (
     RegisterUserCommand,
     UserSummary,
@@ -29,6 +25,9 @@ from app.modules.identity.application.ports import (
 )
 from app.modules.identity.domain.user import User
 from app.modules.identity.domain.value_objects import Email, RawPassword, Username
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class RegisterUserUseCase:

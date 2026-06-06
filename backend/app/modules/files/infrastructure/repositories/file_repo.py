@@ -183,7 +183,7 @@ class SqlAlchemyFileRepository:
 
     # --- helpers ------------------------------------------------------------
 
-    def _owner_column_for(self, owner_type: FileOwnerType):  # type: ignore[no-untyped-def]
+    def _owner_column_for(self, owner_type: FileOwnerType):
         return {
             FileOwnerType.POST: FileOrm.owner_post_id,
             # Ikona wątku korzysta z tej samej kolumny FK co załączniki posta.

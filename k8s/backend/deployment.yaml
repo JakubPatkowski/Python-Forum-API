@@ -3,44 +3,99 @@ kind: Deployment
 metadata:
   name: backend
   namespace: forum-wedkarskie
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
 spec:
-  replicas: 1
+  # Initial size. The HorizontalPodAutoscaler (k8s/backend/hpa.yaml) takes
+  # ownership of this value after the first deploy and scales 2..6 on CPU.
+  replicas: 2
   selector:
     matchLabels:
       app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0      # keep full capacity during rollouts
+      maxSurge: 1
   template:
     metadata:
       labels:
         app: backend
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: forum-wedkarskie
     spec:
+      # ---- Pod-level security context ------------------------------------
+      # The backend image already creates and runs as uid/gid 1000 (see
+      # backend/Dockerfile). Here we *pin* that and make the kubelet refuse to
+      # start the pod if the image ever tries to run as root.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000            # makes the uploads PVC group-writable by uid 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: backend
           image: forum-wedkarskie-backend:latest
-          # Na minikube używamy lokalnego obrazu, dlatego:
+          # On minikube we build the image into the node's docker daemon, so we
+          # must never try to pull it from a registry.
           imagePullPolicy: Never
           ports:
-            - containerPort: 8000
+            - name: http        # named so the ServiceMonitor can scrape by name
+              containerPort: 8000
           envFrom:
             - configMapRef:
                 name: backend-config
+            # Strong JWT signing key — generated, never committed.
+            - secretRef:
+                name: backend-secrets
             # MINIO_ACCESS_KEY / MINIO_SECRET_KEY (and unused MINIO_ROOT_*).
             - secretRef:
                 name: minio-secret
           volumeMounts:
             - name: uploads
               mountPath: /app/uploads
-          readinessProbe:
+            - name: tmp
+              mountPath: /tmp     # writable scratch when the root FS is read-only
+          # ---- Probes ----------------------------------------------------
+          # startup: gives a cold pod time to import the app + connect to DB
+          #          before liveness starts counting.
+          # liveness: process-only check (cheap, never touches the DB) so a
+          #           transient DB outage does NOT restart healthy pods.
+          # readiness: DB-backed (`SELECT 1`) — a pod that lost its DB is taken
+          #            out of the Service endpoints until the DB returns.
+          startupProbe:
             httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 12        # up to ~60s to become live
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 15
+              path: /health/live
+              port: http
+            initialDelaySeconds: 0
             periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # ---- Container-level security context --------------------------
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true      # app writes only to /app/uploads + /tmp
+            capabilities:
+              drop: ["ALL"]
+          # ---- Resources (also the basis for HPA CPU% targeting) ---------
           resources:
             requests:
               cpu: "100m"
@@ -52,3 +107,5 @@ spec:
         - name: uploads
           persistentVolumeClaim:
             claimName: backend-uploads-pvc
+        - name: tmp
+          emptyDir: {}

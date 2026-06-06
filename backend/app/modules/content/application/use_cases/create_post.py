@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import (
     CreatePostCommand,
     PostSummary,
@@ -23,6 +19,9 @@ from app.modules.content.domain.value_objects import (
     Slug,
 )
 from app.modules.identity.domain.user import UserId
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class CreatePostUseCase:
@@ -83,7 +82,7 @@ class CreatePostUseCase:
             summary = await uow.posts.get_with_summary(post.id)
             events = post.pull_events()
 
-        assert summary is not None, "Post must be loadable right after insert"  # noqa: S101
+        assert summary is not None, "Post must be loadable right after insert"
         for event in events:
             await self._bus.publish(event)
         return Ok(summary)

@@ -3,26 +3,70 @@ kind: Deployment
 metadata:
   name: frontend
   namespace: forum-wedkarskie
+  labels:
+    app: frontend
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: forum-wedkarskie
 spec:
-  replicas: 1
+  # Initial size; the frontend HPA (k8s/frontend/hpa.yaml) scales 2..4.
+  replicas: 2
   selector:
     matchLabels:
       app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   template:
     metadata:
       labels:
         app: frontend
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: forum-wedkarskie
     spec:
+      # Stock nginx must start as root to bind :80 and write its cache/pid, so
+      # we do not force runAsNonRoot here. To go fully non-root, switch the
+      # image to nginxinc/nginx-unprivileged (listens on :8080) — see docs/12.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: frontend
           image: forum-wedkarskie-frontend:latest
           imagePullPolicy: Never
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 80
           volumeMounts:
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
       volumes:
         - name: nginx-config
           configMap:

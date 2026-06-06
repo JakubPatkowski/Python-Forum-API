@@ -2,3 +2,15 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: forum-wedkarskie
+  labels:
+    # `kubernetes.io/metadata.name` is added automatically by the API server,
+    # but we add explicit labels too so NetworkPolicies and monitoring
+    # namespaceSelectors can target this namespace by an intent-revealing name.
+    app.kubernetes.io/part-of: forum-wedkarskie
+    name: forum-wedkarskie
+    # Pod Security Admission — enforce the "restricted" profile baseline.
+    # `warn`/`audit` surface violations without blocking; flip to `enforce`
+    # once every workload is compliant (see docs/12, security section).
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

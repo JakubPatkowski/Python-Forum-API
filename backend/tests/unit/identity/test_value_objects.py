@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.shared.domain.errors import ValidationError
-
 from app.modules.identity.domain.value_objects import (
     Email,
     RawPassword,
     Username,
 )
+from app.shared.domain.errors import ValidationError
 
 
 class TestEmail:

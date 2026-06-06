@@ -8,8 +8,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import text
 
-from app.shared.presentation.deps import DbSession
-
 from app.container import (
     get_create_category_uc,
     get_delete_category_uc,
@@ -25,15 +23,15 @@ from app.modules.content.presentation.dto import (
     CategoryResponse,
     CreateCategoryRequest,
 )
-from app.modules.identity.presentation.deps import requires
+from app.modules.identity.presentation.deps import CurrentUserData, requires
 from app.shared.application.result import Err
 from app.shared.domain.errors import DomainError
-
+from app.shared.presentation.deps import DbSession
 
 router = APIRouter()
 
 
-def _raise_if_error(result) -> None:
+def _raise_if_error(result: object) -> None:
     if isinstance(result, Err):
         if isinstance(result.error, DomainError):
             raise result.error
@@ -76,7 +74,7 @@ async def list_categories(
 async def create_category(
     body: CreateCategoryRequest,
     db: DbSession,
-    user=Depends(requires("category.create")),
+    user: CurrentUserData = Depends(requires("category.create")),
     uc: CreateCategoryUseCase = Depends(get_create_category_uc),
 ) -> CategoryResponse:
     result = await uc.execute(body.to_command())
@@ -103,7 +101,7 @@ async def create_category(
 )
 async def delete_category(
     category_id: UUID,
-    _user=Depends(requires("category.manage")),
+    _user: CurrentUserData = Depends(requires("category.manage")),
     uc: DeleteCategoryUseCase = Depends(get_delete_category_uc),
 ) -> Response:
     result = await uc.execute(

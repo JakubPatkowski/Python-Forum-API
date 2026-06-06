@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import (
     CommentSummary,
     UpdateCommentCommand,
@@ -21,6 +17,9 @@ from app.modules.content.domain.value_objects import (
     MarkdownContent,
 )
 from app.modules.identity.domain.user import UserId
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class UpdateCommentUseCase:
@@ -57,7 +56,7 @@ class UpdateCommentUseCase:
             summary = await uow.comments.get_with_summary(comment.id)
             events = comment.pull_events()
 
-        assert summary is not None  # noqa: S101
+        assert summary is not None
         for event in events:
             await self._bus.publish(event)
         return Ok(summary)

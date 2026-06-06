@@ -1,0 +1,37 @@
+# MinIO access under full lockdown:
+#   - S3 API (9000): backend pods AND any source (ipBlock 0.0.0.0/0), because
+#     the BROWSER fetches files via presigned URLs through NodePort 30900.
+#     Leaving 9000 open to all is no worse than the NodePort it already uses.
+#   - Console (9001): backend pods only — reach the web console via
+#     `kubectl port-forward` instead of exposing it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-allow
+  namespace: forum-wedkarskie
+  labels:
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    # S3 API from backend (in-cluster server-side object ops).
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+    # S3 API reachable for browser presigned GET/PUT via NodePort.
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 9000

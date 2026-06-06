@@ -6,15 +6,14 @@ Posts that referenced the category have their ``category_id`` set to NULL
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import DeleteCategoryCommand
 from app.modules.content.application.errors import CategoryNotFound
 from app.modules.content.application.ports import IContentUnitOfWork
 from app.modules.content.domain.category import CategoryId
 from app.modules.content.domain.events import CategoryDeleted
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class DeleteCategoryUseCase:

@@ -44,11 +44,10 @@ from app.modules.identity.presentation.deps import (
 from app.shared.application.result import Err
 from app.shared.domain.errors import DomainError
 
-
 router = APIRouter()
 
 
-def _raise_if_error(result) -> None:
+def _raise_if_error(result: object) -> None:
     if isinstance(result, Err):
         if isinstance(result.error, DomainError):
             raise result.error

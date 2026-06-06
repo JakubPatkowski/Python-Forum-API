@@ -12,10 +12,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
+from app.modules.identity.domain.user import UserId
 from app.shared.domain.entity import Entity
 from app.shared.domain.entity_id import EntityId
-
-from app.modules.identity.domain.user import UserId
 
 
 class RefreshTokenId(EntityId["RefreshToken"]):
@@ -72,7 +71,7 @@ class RefreshToken(Entity[RefreshTokenId]):
 
     # --- mutations ----------------------------------------------------------
 
-    def rotate_to(self, new_token: "RefreshToken") -> None:
+    def rotate_to(self, new_token: RefreshToken) -> None:
         """Mark this token as rotated and link to its replacement."""
         self.status = TokenStatus.ROTATED
         self.revoked_at = datetime.now(UTC)

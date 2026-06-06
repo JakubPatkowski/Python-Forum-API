@@ -1,0 +1,64 @@
+# =============================================================================
+# Helm values for grafana/loki-stack = Loki (monolithic, single binary) +
+# Promtail (log shipper). We DISABLE the bundled Grafana and Prometheus
+# because kube-prometheus-stack already provides them; Loki is added there as
+# a datasource (see values-kube-prometheus-stack.yaml -> additionalDataSources).
+#
+# Install (see scripts/install-monitoring.ps1):
+#   helm repo add grafana https://grafana.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install loki grafana/loki-stack \
+#     --namespace monitoring --create-namespace \
+#     -f k8s/monitoring/values-loki-stack.yaml
+#
+# Result: Promtail tails every pod's stdout/stderr on the node and pushes to
+# Loki at http://loki.monitoring:3100. In Grafana -> Explore -> Loki you can
+# query e.g.  {namespace="forum-wedkarskie", app="backend"}
+# =============================================================================
+
+loki:
+  enabled: true
+  # Pin the Service name so the Grafana datasource URL is deterministic
+  # (http://loki.monitoring.svc.cluster.local:3100). Without this the chart
+  # derives the name from the release and the datasource URL can mismatch,
+  # leaving Grafana's Loki datasource / log panels empty.
+  fullnameOverride: loki
+  isDefault: false
+  # Disposable storage for a demo cluster. For persistence set
+  # persistence.enabled: true and a size.
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "400m"
+      memory: "384Mi"
+  # Ograniczamy tempo przyjmowania logow, zeby Loki nie puchl podczas testow
+  # obciazeniowych (k6 generuje DUZO logow z backendu). Te klucze sa stabilne
+  # we wszystkich wersjach Loki z chartu loki-stack i bezpiecznie sie mergeuja
+  # z domyslna konfiguracja chartu (nie nadpisuja calych sekcji storage/schema).
+  config:
+    limits_config:
+      # Twardszy limit na ingest - chroni Loki przed zalaniem logami z k6.
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+      reject_old_samples: true
+      reject_old_samples_max_age: 24h
+
+promtail:
+  enabled: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "96Mi"
+    limits:
+      cpu: "150m"
+      memory: "192Mi"
+
+# Disable the components provided by kube-prometheus-stack instead.
+grafana:
+  enabled: false
+prometheus:
+  enabled: false

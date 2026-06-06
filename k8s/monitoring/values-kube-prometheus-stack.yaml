@@ -1,0 +1,155 @@
+# =============================================================================
+# Helm values for kube-prometheus-stack (Prometheus + Grafana + Alertmanager +
+# node-exporter + kube-state-metrics) tuned for a single-node minikube.
+#
+# Install (see scripts/install-monitoring.ps1):
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace \
+#     -f k8s/monitoring/values-kube-prometheus-stack.yaml
+#
+# Chart reference: https://github.com/prometheus-community/helm-charts
+# (tested against chart 86.x — pin with `--version` for reproducibility).
+# =============================================================================
+
+# --- kubelet / cAdvisor ------------------------------------------------------
+# Without this the container_cpu_* / container_memory_* metrics are missing and
+# the "CPU/memory by pod" + "Kubernetes / Compute Resources" panels show
+# "No data". The kube-prometheus-stack kubelet ServiceMonitor scrapes cAdvisor
+# (/metrics/cadvisor) through the kubelet.
+#
+# On minikube the kubelet serves metrics over HTTPS with a self-signed cert.
+# We must set insecureSkipVerify + use https scheme + pass the bearer token
+# so Prometheus can actually scrape /metrics/cadvisor. Without these three
+# settings the ServiceMonitor exists but scrapes return TLS errors or 401.
+kubelet:
+  enabled: true
+  serviceMonitor:
+    cAdvisor: true
+    https: true
+    insecureSkipVerify: true
+    # Pass the pod's service-account bearer token so kubelet accepts the scrape.
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+# --- Prometheus --------------------------------------------------------------
+prometheus:
+  prometheusSpec:
+    # Discover ServiceMonitors/PodMonitors/Rules in ALL namespaces regardless
+    # of their labels. Without this the operator only picks objects carrying
+    # the Helm release label, and our app's ServiceMonitor would be ignored.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    # Stamp every scraped sample with cluster="forum-wedkarskie". The stock
+    # kube-prometheus-stack dashboards (e.g. "Compute Resources / Namespace
+    # (Pods)") filter every query by cluster="$cluster". On a fresh minikube the
+    # metrics carry NO cluster label, so $cluster resolves to nothing and those
+    # panels render "No data" even though kube-state-metrics/cAdvisor are healthy.
+    # Adding an external label makes the operator attach it to all series, which
+    # populates the $cluster dropdown and lights the stock dashboards back up.
+    externalLabels:
+      cluster: forum-wedkarskie
+    # Short retention — this is a demo cluster, not long-term storage.
+    # 3h jest wystarczające do obejrzenia wyników testu k6 zaraz po jego końcu,
+    # a zmniejsza ilość serii trzymanych w RAM (mniejszy footprint na 16 GB).
+    retention: 3h
+    # Twardy limit rozmiaru bloków na dysku — chroni przed puchnięciem TSDB
+    # podczas testów obciążeniowych (dużo serii = dużo próbek).
+    retentionSize: "1GB"
+    # Keep the footprint small on minikube. Limit RAM Prometheusa jest
+    # najważniejszy podczas testów k6 — przy dużej liczbie serii head-block
+    # potrafi puchnąć; 768Mi to bezpieczny kompromis dla tej skali.
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "350Mi"
+      limits:
+        cpu: "800m"
+        memory: "768Mi"
+    # emptyDir storage (data is disposable). For persistence, add a
+    # storageSpec with a volumeClaimTemplate here.
+
+# --- Grafana -----------------------------------------------------------------
+grafana:
+  # Dev-only credentials — change before exposing Grafana anywhere shared.
+  adminUser: admin
+  adminPassword: admin
+  defaultDashboardsEnabled: true        # ship the stock k8s/node dashboards
+  # PRZYCZYNA AWARII: Grafana 13.x z limitem 256Mi była zabijana przez OOMKiller
+  # (Exit Code 137). Sam start + indeksowanie bleve + wczytanie dashboardów
+  # przekracza 256Mi. Pod restartował się co kilka minut, dlatego port-forward
+  # dostawał "connection refused" (pod akurat nie żył). Podnosimy limit do 512Mi.
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
+  # Wylaczamy zbedne dla demo funkcje, ktore obciazaja pamiec/siec przy starcie:
+  # sprawdzanie aktualizacji i raportowanie telemetrii. Mniejszy footprint RAM.
+  env:
+    GF_ANALYTICS_REPORTING_ENABLED: "false"
+    GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+  # Liveness z dluzszym startem: jesli pierwszy start Grafany trwa (indeksowanie),
+  # nie zabijaj poda od razu - inaczej wpada w petle restartow.
+  livenessProbe:
+    initialDelaySeconds: 90
+    timeoutSeconds: 30
+    failureThreshold: 10
+    periodSeconds: 10
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard          # ConfigMaps with this label are imported
+      labelValue: "1"
+      searchNamespace: ALL              # pick up our dashboard in any namespace
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      searchNamespace: ALL
+  # Wire Loki as a second datasource so logs and metrics live in one Grafana.
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      isDefault: false
+  # Reachable at http://grafana.local once the ingress (k8s/ingress) is applied.
+  # The ingress is optional — port-forward works too (scripts/portforward.ps1).
+
+# --- Alertmanager ------------------------------------------------------------
+# WYŁĄCZONY: nie wysyłamy alertów (brak konfiguracji odbiorców), a Alertmanager
+# zajmował ~128Mi RAM i generował szum. Reguły alertowe (prometheus-rules.yaml)
+# nadal działają i są widoczne w Prometheus -> Alerts — tylko nie ma komponentu,
+# który by je gdzieś wysyłał. Odzyskaną pamięć przeznaczamy na Grafanę.
+alertmanager:
+  enabled: false
+
+# --- node-exporter + kube-state-metrics --------------------------------------
+# These provide the node/pod CPU+memory metrics shown on the "Kubernetes /
+# Compute Resources" dashboards (your "how much each pod uses" view).
+nodeExporter:
+  enabled: true
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: "20m"
+      memory: "64Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+
+# Trim components that a single-node minikube control plane does not expose,
+# to avoid noisy "target down" alerts during the demo.
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

@@ -3,8 +3,14 @@ kind: Deployment
 metadata:
   name: postgres
   namespace: forum-wedkarskie
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: forum-wedkarskie
 spec:
   replicas: 1
+  strategy:
+    type: Recreate          # single RWO volume — never run two pods at once
   selector:
     matchLabels:
       app: postgres
@@ -12,18 +18,56 @@ spec:
     metadata:
       labels:
         app: postgres
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: forum-wedkarskie
     spec:
+      # NOTE on security context: the official postgres image must start as
+      # root to fix the data-dir ownership, then it drops to the `postgres`
+      # user itself (su-exec). So we deliberately do NOT set runAsNonRoot or
+      # drop ALL capabilities here — that would break the entrypoint. We apply
+      # only the parts that are safe for this image.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: postgres:16-alpine
           ports:
-            - containerPort: 5432
+            - name: postgres
+              containerPort: 5432
           envFrom:
             - secretRef:
                 name: postgres-secret
           volumeMounts:
-            - mountPath: /var/lib/postgresql/data
-              name: postgres-data
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          # Readiness gates traffic until the DB actually accepts connections;
+          # liveness restarts a wedged server.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "forum_wedkarskie"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            # Dropping privileges (root -> postgres) is always allowed, so
+            # no_new_privs is safe here.
+            allowPrivilegeEscalation: false
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
       volumes:
         - name: postgres-data
           persistentVolumeClaim:

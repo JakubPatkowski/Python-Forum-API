@@ -29,7 +29,6 @@ from app.modules.identity.domain.refresh_token import (
 )
 from app.modules.identity.domain.user import User
 
-
 _ACCESS_TYPE = "access"
 _REFRESH_TYPE = "refresh"
 

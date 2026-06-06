@@ -45,7 +45,7 @@ class CategoryResponse(BaseModel):
     @classmethod
     def from_summary(
         cls, c: CategorySummary, owner_id: UUID | None = None
-    ) -> "CategoryResponse":
+    ) -> CategoryResponse:
         return cls(
             id=c.public_id,
             name=c.name,

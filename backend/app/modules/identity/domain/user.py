@@ -10,10 +10,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from app.shared.domain.entity import AggregateRoot
-from app.shared.domain.entity_id import EntityId
-from app.shared.domain.errors import ValidationError
-
 from app.modules.identity.domain.events import (
     UserBlocked,
     UserPermissionChanged,
@@ -24,6 +20,9 @@ from app.modules.identity.domain.events import (
 from app.modules.identity.domain.permission import Permission
 from app.modules.identity.domain.role import Role
 from app.modules.identity.domain.value_objects import Email, Username
+from app.shared.domain.entity import AggregateRoot
+from app.shared.domain.entity_id import EntityId
+from app.shared.domain.errors import ValidationError
 
 
 class UserId(EntityId["User"]):
@@ -137,7 +136,7 @@ class User(AggregateRoot[UserId]):
         email: Email,
         password_hash: str,
         default_role: Role,
-    ) -> "User":
+    ) -> User:
         """Factory for fresh registrations. Emits :class:`UserRegistered`."""
         user = cls(
             id=UserId.new(),

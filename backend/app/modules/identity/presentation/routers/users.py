@@ -11,10 +11,8 @@ from app.modules.identity.application.commands import UserSummary
 from app.modules.identity.application.errors import UserNotFound
 from app.modules.identity.application.ports import IIdentityUnitOfWork
 from app.modules.identity.domain.user import UserId
-
 from app.modules.identity.presentation.deps import CurrentUser
 from app.modules.identity.presentation.dto.user_dto import UserResponse
-
 
 router = APIRouter()
 

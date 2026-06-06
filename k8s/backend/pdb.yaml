@@ -1,0 +1,18 @@
+# PodDisruptionBudget — keeps at least 1 backend pod serving during voluntary
+# disruptions (node drain, rolling update, cluster upgrade). Pairs with the
+# HPA minReplicas: 2 so a drain can never take the API fully offline.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: forum-wedkarskie
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  minAvailable: 1
+  selector:
+    # Target only the long-running Deployment pods, not the short-lived
+    # migrate/cleanup Jobs (which also carry `app: backend`).
+    matchLabels:
+      app.kubernetes.io/name: backend

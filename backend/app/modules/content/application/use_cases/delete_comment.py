@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from app.shared.application.event_bus import IEventBus
-from app.shared.application.result import Err, Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import DeleteCommentCommand
 from app.modules.content.application.errors import (
     CommentNotFound,
@@ -14,6 +10,9 @@ from app.modules.content.application.errors import (
 from app.modules.content.application.ports import IContentUnitOfWork
 from app.modules.content.domain.comment import CommentId
 from app.modules.identity.domain.user import UserId
+from app.shared.application.event_bus import IEventBus
+from app.shared.application.result import Err, Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class DeleteCommentUseCase:

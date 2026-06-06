@@ -21,12 +21,10 @@ from app.modules.identity.domain.role import Role, RoleId
 from app.modules.identity.domain.user import User, UserId, UserStatus
 from app.modules.identity.domain.value_objects import Email, Username
 from app.modules.identity.infrastructure.orm import (
-    PermissionOrm,
     RefreshTokenOrm,
     RoleOrm,
     UserOrm,
 )
-
 
 # Map status enum values between domain and DB. Both happen to share the
 # same strings; keeping the table makes the boundary explicit.

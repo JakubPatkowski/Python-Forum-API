@@ -3,10 +3,17 @@ kind: Service
 metadata:
   name: backend-service
   namespace: forum-wedkarskie
+  labels:
+    # The ServiceMonitor (k8s/monitoring/servicemonitor-backend.yaml) selects
+    # this Service by these labels to discover the /metrics scrape target.
+    app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
 spec:
   selector:
     app: backend
   ports:
-    - port: 8000
-      targetPort: 8000
+    - name: http          # must match the ServiceMonitor `port` field
+      port: 8000
+      targetPort: http
   type: ClusterIP

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from app.shared.application.result import Ok, Result
-from app.shared.domain.errors import DomainError
-
 from app.modules.content.application.commands import TagSummary
 from app.modules.content.application.ports import IContentUnitOfWork
+from app.shared.application.result import Ok, Result
+from app.shared.domain.errors import DomainError
 
 
 class ListTagsUseCase:

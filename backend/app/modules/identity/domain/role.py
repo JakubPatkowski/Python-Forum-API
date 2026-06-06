@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from app.modules.identity.domain.permission import Permission
 from app.shared.domain.entity import Entity
 from app.shared.domain.entity_id import EntityId
-
-from app.modules.identity.domain.permission import Permission
 
 
 class RoleId(EntityId["Role"]):

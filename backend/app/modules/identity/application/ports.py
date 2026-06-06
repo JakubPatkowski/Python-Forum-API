@@ -7,11 +7,9 @@ here keeps the application layer decoupled from SQLAlchemy / PyJWT / Argon2.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Self
 from types import TracebackType
+from typing import Protocol, Self
 from uuid import UUID
-
-from app.shared.application.repository import IRepository
 
 from app.modules.identity.domain.refresh_token import (
     RefreshToken,
@@ -20,7 +18,7 @@ from app.modules.identity.domain.refresh_token import (
 from app.modules.identity.domain.role import Role
 from app.modules.identity.domain.user import User, UserId
 from app.modules.identity.domain.value_objects import Email, Username
-
+from app.shared.application.repository import IRepository
 
 # --------------------------------------------------------------------------- #
 # Repositories                                                                #

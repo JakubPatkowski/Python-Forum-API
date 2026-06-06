@@ -7,11 +7,13 @@ after the aggregate is persisted.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.shared.domain.entity_id import EntityId
 from app.shared.domain.events import DomainEvent
 
 
-class Entity[ID: EntityId]:
+class Entity[ID: EntityId[Any]]:
     """Base class for entities. Identity-based equality."""
 
     id: ID
@@ -23,7 +25,7 @@ class Entity[ID: EntityId]:
         return hash(self.id)
 
 
-class AggregateRoot[ID: EntityId](Entity[ID]):
+class AggregateRoot[ID: EntityId[Any]](Entity[ID]):
     """Aggregate root — entry point for an aggregate boundary.
 
     Aggregate roots record domain events that callers (use cases) should

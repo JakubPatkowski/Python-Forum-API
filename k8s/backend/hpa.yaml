@@ -1,0 +1,57 @@
+# HorizontalPodAutoscaler for the backend.
+#
+# Requires the metrics-server (CPU/memory metrics API):
+#   minikube addons enable metrics-server
+#
+# Demo:
+#   kubectl get hpa backend -n forum-wedkarskie -w     # watch replicas climb
+#   # in another terminal, run the k6 load test (load/) and watch it scale.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+  namespace: forum-wedkarskie
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: forum-wedkarskie
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    # Scale out when average CPU across pods exceeds 70% of the 100m request.
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Also react to memory pressure (80% of the 128Mi request).
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      # React quickly to load spikes (good for a live demo).
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100          # may double the pod count ...
+          periodSeconds: 30
+        - type: Pods
+          value: 2            # ... or add 2 pods, whichever is larger
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      # Scale in slowly so a brief dip in traffic does not flap replicas.
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60

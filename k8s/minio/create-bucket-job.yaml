@@ -7,17 +7,45 @@ kind: Job
 metadata:
   name: minio-create-bucket
   namespace: forum-wedkarskie
+  labels:
+    app: minio
+    component: create-bucket
 spec:
   backoffLimit: 10
+  ttlSecondsAfterFinished: 600
   template:
+    metadata:
+      labels:
+        # `app: minio` is required... no — this Job is a *client* of MinIO.
+        # It only needs to reach minio-service:9000, which the minio
+        # NetworkPolicy allows from backend; to keep it simple it is labelled
+        # app: backend so the same allow rule applies.
+        app: backend
+        component: create-bucket
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: mc
-          image: minio/mc:latest
+          # Pinned release tag (not :latest) for deterministic deploys.
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
           envFrom:
             - secretRef:
                 name: minio-secret
+          env:
+            # mc writes its alias config to $HOME by default, which a non-root
+            # user cannot write. Point it at the writable emptyDir instead.
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           command:
             - /bin/sh
             - -c
@@ -28,3 +56,16 @@ spec:
               done;
               mc mb --ignore-existing local/forum-files;
               echo 'bucket forum-files ready';
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+      volumes:
+        - name: tmp
+          emptyDir: {}
