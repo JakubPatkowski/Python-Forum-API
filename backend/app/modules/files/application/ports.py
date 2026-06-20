@@ -40,9 +40,7 @@ class IFileStorage(Protocol):
     async def ensure_bucket(self) -> None:
         """Create the configured bucket if it does not exist (idempotent)."""
 
-    async def presigned_put_url(
-        self, key: str, *, content_type: str, expires_seconds: int
-    ) -> str:
+    async def presigned_put_url(self, key: str, *, content_type: str, expires_seconds: int) -> str:
         """A time-limited URL the browser uses to PUT bytes straight to MinIO."""
 
     async def presigned_get_url(
@@ -101,9 +99,7 @@ class IFileProcessor(Protocol):
     def probe_image(self, data: bytes) -> tuple[int, int] | None:
         """Return ``(width, height)`` for an image, else ``None``."""
 
-    def make_image_variants(
-        self, data: bytes, *, sizes: dict[str, int]
-    ) -> list[ProcessedVariant]:
+    def make_image_variants(self, data: bytes, *, sizes: dict[str, int]) -> list[ProcessedVariant]:
         """Generate downscaled renditions; only sizes smaller than the source."""
 
 
@@ -118,9 +114,7 @@ class IFileRepository(IRepository[File, FileId], Protocol):
     async def save(self, file: File) -> None:
         """Persist mutations on an already-loaded file (status, owner, …)."""
 
-    async def list_for_owner(
-        self, owner_type: FileOwnerType, owner_public_id: UUID
-    ) -> list[File]:
+    async def list_for_owner(self, owner_type: FileOwnerType, owner_public_id: UUID) -> list[File]:
         """All READY files attached to a given owner, oldest first."""
 
     async def list_by_uploader(
@@ -178,22 +172,14 @@ class IFilesUnitOfWork(Protocol):
 
     # --- avatar / category image FKs ---------------------------------------
 
-    async def set_user_avatar(
-        self, user_public_id: UUID, file_internal_id: int | None
-    ) -> None:
+    async def set_user_avatar(self, user_public_id: UUID, file_internal_id: int | None) -> None:
         """Point ``users.avatar_file_id`` at a file (or clear it with None)."""
 
-    async def current_avatar_file_public_id(
-        self, user_public_id: UUID
-    ) -> UUID | None:
+    async def current_avatar_file_public_id(self, user_public_id: UUID) -> UUID | None:
         """Public id of the user's current avatar file, if any."""
 
-    async def current_category_image_file_public_id(
-        self, category_public_id: UUID
-    ) -> UUID | None:
+    async def current_category_image_file_public_id(self, category_public_id: UUID) -> UUID | None:
         """Public id of a category's current image file, if any."""
 
-    async def current_post_icon_file_public_id(
-        self, post_public_id: UUID
-    ) -> UUID | None:
+    async def current_post_icon_file_public_id(self, post_public_id: UUID) -> UUID | None:
         """Public id of a post's current icon file, if any."""

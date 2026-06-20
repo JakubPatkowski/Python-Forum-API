@@ -35,9 +35,7 @@ class AddCommentUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: AddCommentCommand
-    ) -> Result[CommentSummary, DomainError]:
+    async def execute(self, cmd: AddCommentCommand) -> Result[CommentSummary, DomainError]:
         fmt = ContentFormat(cmd.content_format)
         content = MarkdownContent(body=cmd.content, format=fmt)
         author_id = UserId(cmd.author_public_id)
@@ -50,17 +48,11 @@ class AddCommentUseCase:
 
             parent: Comment | None = None
             if cmd.parent_comment_public_id is not None:
-                parent = await uow.comments.get(
-                    CommentId(cmd.parent_comment_public_id)
-                )
+                parent = await uow.comments.get(CommentId(cmd.parent_comment_public_id))
                 if parent is None:
-                    return Err(
-                        CommentNotFound(str(cmd.parent_comment_public_id))
-                    )
+                    return Err(CommentNotFound(str(cmd.parent_comment_public_id)))
                 if parent.post_id != post_id:
-                    return Err(
-                        CommentNotFound(str(cmd.parent_comment_public_id))
-                    )
+                    return Err(CommentNotFound(str(cmd.parent_comment_public_id)))
 
             comment = Comment.create(
                 post_id=post_id,

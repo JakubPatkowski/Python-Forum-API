@@ -168,9 +168,7 @@ class User(AggregateRoot[UserId]):
             return
         self._status = UserStatus.BLOCKED
         self._touch()
-        self.record_event(
-            UserBlocked(user_id=self.id.value, blocked_by=by.value if by else None)
-        )
+        self.record_event(UserBlocked(user_id=self.id.value, blocked_by=by.value if by else None))
 
     def unblock(self, *, by: UserId | None = None) -> None:
         if self._status == UserStatus.ACTIVE:
@@ -178,9 +176,7 @@ class User(AggregateRoot[UserId]):
         self._status = UserStatus.ACTIVE
         self._touch()
         self.record_event(
-            UserUnblocked(
-                user_id=self.id.value, unblocked_by=by.value if by else None
-            )
+            UserUnblocked(user_id=self.id.value, unblocked_by=by.value if by else None)
         )
 
     def assign_role(self, role: Role, *, by: UserId | None = None) -> None:
@@ -211,9 +207,7 @@ class User(AggregateRoot[UserId]):
             )
         )
 
-    def grant_permission(
-        self, permission: Permission, *, by: UserId | None = None
-    ) -> None:
+    def grant_permission(self, permission: Permission, *, by: UserId | None = None) -> None:
         """Add a per-user permission override that grants the code."""
         self._denied.discard(permission)
         if permission in self._granted:
@@ -229,9 +223,7 @@ class User(AggregateRoot[UserId]):
             )
         )
 
-    def deny_permission(
-        self, permission: Permission, *, by: UserId | None = None
-    ) -> None:
+    def deny_permission(self, permission: Permission, *, by: UserId | None = None) -> None:
         """Add a per-user permission override that denies the code."""
         self._granted.discard(permission)
         if permission in self._denied:

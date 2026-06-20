@@ -1,0 +1,72 @@
+# Performance regression detection with k6.
+#
+# Brings up the full app stack with docker compose, then runs the committed k6
+# "smoke" profile. That profile defines thresholds (p95 latency < 800 ms,
+# error rate < 1%); k6 exits non-zero when a threshold is breached, so a
+# performance regression fails the job. The JSON summary is uploaded as an
+# artifact for trend inspection. No comments or alerts are emitted.
+name: Performance (k6)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+      - 'load/**'
+      - '.github/workflows/performance.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'load/**'
+      - '.github/workflows/performance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  k6:
+    name: k6 smoke / thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start application stack
+        run: docker compose up -d --build backend
+
+      - name: Wait for backend readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/health/ready >/dev/null 2>&1; then
+              echo "backend ready"; exit 0
+            fi
+            sleep 3
+          done
+          echo "backend did not become ready in time"; docker compose logs backend; exit 1
+
+      - name: Run k6 (smoke profile, thresholds enforced)
+        run: |
+          docker run --rm --network host \
+            -e BASE_URL=http://localhost:8000 \
+            -e PROFILE=smoke \
+            -v "$PWD/load:/scripts:ro" \
+            -v "$PWD:/out" \
+            grafana/k6:latest run /scripts/k6-load-test.js \
+            --summary-export=/out/k6-summary.json
+
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summary
+          path: k6-summary.json
+          retention-days: 30
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v

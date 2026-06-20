@@ -128,14 +128,8 @@ class PostResponse(BaseModel):
             slug=s.slug,
             content=s.content,
             content_format=s.content_format,
-            author=AuthorResponse(
-                public_id=s.author.public_id, username=s.author.username
-            ),
-            category=(
-                CategoryRefResponse.from_summary(s.category)
-                if s.category
-                else None
-            ),
+            author=AuthorResponse(public_id=s.author.public_id, username=s.author.username),
+            category=(CategoryRefResponse.from_summary(s.category) if s.category else None),
             tags=[TagRefResponse.from_summary(t) for t in s.tags],
             is_deleted=s.is_deleted,
             comment_count=s.comment_count,

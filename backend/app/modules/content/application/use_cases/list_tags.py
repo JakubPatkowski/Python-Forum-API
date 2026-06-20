@@ -15,11 +15,4 @@ class ListTagsUseCase:
     async def execute(self) -> Result[list[TagSummary], DomainError]:
         async with self._uow as uow:
             tags = await uow.tags.list_all()
-        return Ok(
-            [
-                TagSummary(
-                    public_id=t.id.value, name=t.name, slug=str(t.slug)
-                )
-                for t in tags
-            ]
-        )
+        return Ok([TagSummary(public_id=t.id.value, name=t.name, slug=str(t.slug)) for t in tags])

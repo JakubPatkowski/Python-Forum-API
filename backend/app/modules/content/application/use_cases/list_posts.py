@@ -25,9 +25,7 @@ class ListPostsUseCase:
     def __init__(self, uow: IContentUnitOfWork) -> None:
         self._uow = uow
 
-    async def execute(
-        self, q: ListPostsQuery
-    ) -> Result[PostListPage, DomainError]:
+    async def execute(self, q: ListPostsQuery) -> Result[PostListPage, DomainError]:
         limit = max(1, min(q.limit or self.DEFAULT_LIMIT, self.MAX_LIMIT))
         cursor = PostCursor.decode(q.cursor) if q.cursor else None
 

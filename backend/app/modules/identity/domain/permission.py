@@ -78,8 +78,8 @@ _USER_BUNDLE: tuple[str, ...] = (
     "file.upload",
     "file.download",
     "file.delete.own",
-    # Każdy zalogowany użytkownik może założyć nową kategorię (decyzja produktowa).
-    # Usuwanie kategorii pozostaje przy moderatorze (``category.manage``).
+    # Any logged-in user can create a new category (product decision).
+    # Deleting a category stays with the moderator (``category.manage``).
     "category.create",
 )
 

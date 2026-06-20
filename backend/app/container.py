@@ -299,15 +299,11 @@ def get_list_owner_files_uc() -> ListOwnerFilesUseCase:
 
 
 def get_attach_files_uc() -> AttachFilesUseCase:
-    return AttachFilesUseCase(
-        uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus()
-    )
+    return AttachFilesUseCase(uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus())
 
 
 def get_delete_file_uc() -> DeleteFileUseCase:
-    return DeleteFileUseCase(
-        uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus()
-    )
+    return DeleteFileUseCase(uow=get_files_uow(), storage=get_file_storage(), bus=get_event_bus())
 
 
 def get_set_avatar_uc() -> SetAvatarUseCase:

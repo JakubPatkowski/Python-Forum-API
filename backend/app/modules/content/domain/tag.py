@@ -42,9 +42,7 @@ class Tag(Entity[TagId]):
         if len(cleaned) > 50:
             from app.shared.domain.errors import ValidationError
 
-            raise ValidationError(
-                "Tag name must be at most 50 characters", field="name"
-            )
+            raise ValidationError("Tag name must be at most 50 characters", field="name")
         return cls(
             id=TagId.new(),
             name=cleaned,

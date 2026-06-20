@@ -24,9 +24,7 @@ class CreateTagUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: CreateTagCommand
-    ) -> Result[TagSummary, DomainError]:
+    async def execute(self, cmd: CreateTagCommand) -> Result[TagSummary, DomainError]:
         name = cmd.name.strip().lower()
 
         async with self._uow as uow:
@@ -38,6 +36,4 @@ class CreateTagUseCase:
             await self._bus.publish(
                 TagCreated(tag_id=tag.id.value, name=tag.name, slug=str(tag.slug))
             )
-        return Ok(
-            TagSummary(public_id=tag.id.value, name=tag.name, slug=str(tag.slug))
-        )
+        return Ok(TagSummary(public_id=tag.id.value, name=tag.name, slug=str(tag.slug)))

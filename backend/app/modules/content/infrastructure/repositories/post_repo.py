@@ -62,25 +62,19 @@ class SqlAlchemyPostRepository(IPostRepository):
     # --- read --------------------------------------------------------------
 
     async def get(self, id_: PostId) -> Post | None:
-        row = self._session.scalar(
-            select(PostOrm).where(PostOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(PostOrm).where(PostOrm.public_id == id_.value))
         if row is None:
             return None
         return self._hydrate_post(row)
 
     async def exists(self, id_: PostId) -> bool:
         return (
-            self._session.scalar(
-                select(PostOrm.id).where(PostOrm.public_id == id_.value)
-            )
+            self._session.scalar(select(PostOrm.id).where(PostOrm.public_id == id_.value))
             is not None
         )
 
     async def get_with_summary(self, id_: PostId) -> PostSummary | None:
-        row = self._session.scalar(
-            select(PostOrm).where(PostOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(PostOrm).where(PostOrm.public_id == id_.value))
         if row is None:
             return None
         return self._project_summary(row)
@@ -115,9 +109,9 @@ class SqlAlchemyPostRepository(IPostRepository):
     ) -> PostListPage:
         stmt = select(PostOrm).where(PostOrm.is_deleted.is_(False))
         if category_public_id is not None:
-            stmt = stmt.join(
-                CategoryOrm, CategoryOrm.id == PostOrm.category_id
-            ).where(CategoryOrm.public_id == category_public_id)
+            stmt = stmt.join(CategoryOrm, CategoryOrm.id == PostOrm.category_id).where(
+                CategoryOrm.public_id == category_public_id
+            )
         if tag_slug is not None:
             stmt = (
                 stmt.join(PostTagOrm, PostTagOrm.post_id == PostOrm.id)
@@ -141,9 +135,7 @@ class SqlAlchemyPostRepository(IPostRepository):
                 )
             )
 
-        stmt = stmt.order_by(
-            PostOrm.created_at.desc(), PostOrm.public_id.desc()
-        ).limit(limit + 1)
+        stmt = stmt.order_by(PostOrm.created_at.desc(), PostOrm.public_id.desc()).limit(limit + 1)
 
         rows = self._session.scalars(stmt).all()
 
@@ -154,9 +146,7 @@ class SqlAlchemyPostRepository(IPostRepository):
         summaries = self._project_summaries_batch(rows)
         if len(summaries) == limit:
             tail = summaries[-1]
-            next_cursor = PostCursor(
-                created_at=tail.created_at, public_id=tail.public_id
-            ).encode()
+            next_cursor = PostCursor(created_at=tail.created_at, public_id=tail.public_id).encode()
         return PostListPage(items=summaries, next_cursor=next_cursor)
 
     # --- write -------------------------------------------------------------
@@ -165,22 +155,14 @@ class SqlAlchemyPostRepository(IPostRepository):
         """Insert or update the post and synchronise its tag links."""
         author_db_id = self._resolve_user_id(entity.author_id.value)
         if author_db_id is None:
-            raise ValueError(
-                f"Unknown author {entity.author_id.value} — user must exist first"
-            )
+            raise ValueError(f"Unknown author {entity.author_id.value} — user must exist first")
         category_db_id = (
-            self._resolve_category_id(entity.category_id.value)
-            if entity.category_id
-            else None
+            self._resolve_category_id(entity.category_id.value) if entity.category_id else None
         )
         if entity.category_id and category_db_id is None:
-            raise ValueError(
-                f"Unknown category {entity.category_id.value} — must exist first"
-            )
+            raise ValueError(f"Unknown category {entity.category_id.value} — must exist first")
 
-        row = self._session.scalar(
-            select(PostOrm).where(PostOrm.public_id == entity.id.value)
-        )
+        row = self._session.scalar(select(PostOrm).where(PostOrm.public_id == entity.id.value))
         if row is None:
             row = PostOrm(
                 public_id=entity.id.value,
@@ -209,9 +191,7 @@ class SqlAlchemyPostRepository(IPostRepository):
 
     async def remove(self, entity: Post) -> None:
         self._session.execute(
-            PostOrm.__table__.delete().where(
-                PostOrm.public_id == entity.id.value
-            )
+            PostOrm.__table__.delete().where(PostOrm.public_id == entity.id.value)
         )
 
     # --- helpers ------------------------------------------------------------
@@ -235,9 +215,9 @@ class SqlAlchemyPostRepository(IPostRepository):
                 category = category_from_orm(cat_row)
 
         tag_rows = self._session.scalars(
-            select(TagOrm).join(PostTagOrm, PostTagOrm.tag_id == TagOrm.id).where(
-                PostTagOrm.post_id == row.id
-            )
+            select(TagOrm)
+            .join(PostTagOrm, PostTagOrm.tag_id == TagOrm.id)
+            .where(PostTagOrm.post_id == row.id)
         ).all()
         tags: set[Tag] = {tag_from_orm(t) for t in tag_rows}
 
@@ -262,9 +242,7 @@ class SqlAlchemyPostRepository(IPostRepository):
             author_public_id=author_public_id,
         )
 
-    def _project_summaries_batch(
-        self, rows: Sequence[PostOrm]
-    ) -> tuple[PostSummary, ...]:
+    def _project_summaries_batch(self, rows: Sequence[PostOrm]) -> tuple[PostSummary, ...]:
         """Project a page of posts using a fixed, small number of queries.
 
         Building the per-row :class:`PostSummary` projection naively issues
@@ -278,22 +256,18 @@ class SqlAlchemyPostRepository(IPostRepository):
             return ()
 
         author_ids = {r.author_id for r in rows if r.author_id is not None}
-        category_ids = {
-            r.category_id for r in rows if r.category_id is not None
-        }
+        category_ids = {r.category_id for r in rows if r.category_id is not None}
         post_ids = [r.id for r in rows]
 
         # --- authors: id -> AuthorSummary -------------------------------------
         authors: dict[int, AuthorSummary] = {}
         if author_ids:
             for uid, public_id, username in self._session.execute(
-                select(
-                    UserOrm.id, UserOrm.public_id, UserOrm.username
-                ).where(UserOrm.id.in_(author_ids))
-            ).all():
-                authors[uid] = AuthorSummary(
-                    public_id=public_id, username=username
+                select(UserOrm.id, UserOrm.public_id, UserOrm.username).where(
+                    UserOrm.id.in_(author_ids)
                 )
+            ).all():
+                authors[uid] = AuthorSummary(public_id=public_id, username=username)
 
         # --- categories: id -> CategorySummary --------------------------------
         categories: dict[int, CategorySummary] = {}
@@ -316,7 +290,7 @@ class SqlAlchemyPostRepository(IPostRepository):
 
         # --- comment counts: post_id -> int -----------------------------------
         # ``is_deleted`` may be NULL on legacy rows (pre-0004); treat as live.
-        counts_by_post: dict[int, int] = {pid: 0 for pid in post_ids}
+        counts_by_post: dict[int, int] = dict.fromkeys(post_ids, 0)
         for post_id, count in self._session.execute(
             select(CommentOrm.post_id, func.count(CommentOrm.id))
             .where(
@@ -333,12 +307,8 @@ class SqlAlchemyPostRepository(IPostRepository):
         return tuple(
             post_summary_from_row(
                 row,
-                author=authors.get(
-                    row.author_id, AuthorSummary(public_id=None, username=None)
-                ),
-                category=categories.get(row.category_id)
-                if row.category_id is not None
-                else None,
+                author=authors.get(row.author_id, AuthorSummary(public_id=None, username=None)),
+                category=categories.get(row.category_id) if row.category_id is not None else None,
                 tags=tuple(tags_by_post.get(row.id, ())),
                 comment_count=counts_by_post.get(row.id, 0),
             )
@@ -348,16 +318,12 @@ class SqlAlchemyPostRepository(IPostRepository):
     def _project_summary(self, row: PostOrm) -> PostSummary:
         # Author summary
         author_row = self._session.execute(
-            select(UserOrm.public_id, UserOrm.username).where(
-                UserOrm.id == row.author_id
-            )
+            select(UserOrm.public_id, UserOrm.username).where(UserOrm.id == row.author_id)
         ).one_or_none()
         if author_row is None:
             author = AuthorSummary(public_id=None, username=None)
         else:
-            author = AuthorSummary(
-                public_id=author_row[0], username=author_row[1]
-            )
+            author = AuthorSummary(public_id=author_row[0], username=author_row[1])
 
         # Category summary
         category_summary: CategorySummary | None = None
@@ -375,9 +341,7 @@ class SqlAlchemyPostRepository(IPostRepository):
             .where(PostTagOrm.post_id == row.id)
             .order_by(TagOrm.name)
         ).all()
-        tags: tuple[TagSummary, ...] = tuple(
-            tag_summary_from_orm(t) for t in tag_rows
-        )
+        tags: tuple[TagSummary, ...] = tuple(tag_summary_from_orm(t) for t in tag_rows)
 
         # Comment count — count both legacy and phase-2 comments. ``is_deleted``
         # may be NULL on legacy rows from before migration 0004; treat as live.
@@ -408,24 +372,18 @@ class SqlAlchemyPostRepository(IPostRepository):
 
         if not desired_public_ids:
             self._session.execute(
-                PostTagOrm.__table__.delete().where(
-                    PostTagOrm.post_id == post_db_id
-                )
+                PostTagOrm.__table__.delete().where(PostTagOrm.post_id == post_db_id)
             )
             return
 
         tag_db_rows = self._session.execute(
-            select(TagOrm.id, TagOrm.public_id).where(
-                TagOrm.public_id.in_(desired_public_ids)
-            )
+            select(TagOrm.id, TagOrm.public_id).where(TagOrm.public_id.in_(desired_public_ids))
         ).all()
         desired_db_ids = {r[0] for r in tag_db_rows}
 
         existing_db_ids = set(
             self._session.scalars(
-                select(PostTagOrm.tag_id).where(
-                    PostTagOrm.post_id == post_db_id
-                )
+                select(PostTagOrm.tag_id).where(PostTagOrm.post_id == post_db_id)
             ).all()
         )
         # Delete removed links
@@ -439,6 +397,4 @@ class SqlAlchemyPostRepository(IPostRepository):
             )
         # Insert new links
         for tag_db_id in desired_db_ids - existing_db_ids:
-            self._session.add(
-                PostTagOrm(post_id=post_db_id, tag_id=tag_db_id)
-            )
+            self._session.add(PostTagOrm(post_id=post_db_id, tag_id=tag_db_id))

@@ -10,6 +10,14 @@ data:
   # the `backend-secrets` Secret (see k8s/backend/secret.example.yaml and the
   # `secretRef` in deployment.yaml). Generate it with `openssl rand -hex 64`.
   DEBUG: "false"
+  # --- DB connection pool ----------------------------------------------------
+  # Budget: HPA maxReplicas(3) × (POOL_SIZE + MAX_OVERFLOW) = 60 < Postgres
+  # max_connections (100). The old defaults (5+10) were exhausted under the
+  # load test (30 s timeout -> readiness probes failed). Details: docs/20.
+  DB_POOL_SIZE: "10"
+  DB_MAX_OVERFLOW: "10"
+  DB_POOL_TIMEOUT_SECONDS: "5"
+  DB_POOL_RECYCLE_SECONDS: "1800"
   UPLOAD_DIR: "/app/uploads"
   MAX_UPLOAD_SIZE_BYTES: "26214400"
   MAX_COMMENT_DEPTH: "5"
@@ -21,9 +29,12 @@ data:
   # In-cluster endpoint the backend uses for all server-side object ops.
   MINIO_ENDPOINT: "minio-service:9000"
   # Endpoint embedded in presigned URLs (must be reachable by the BROWSER).
-  # Replace <minikube-ip> with the output of `minikube ip` (NodePort 30900).
-  # scripts/deploy.ps1 substitutes this automatically on each deploy.
-  MINIO_PUBLIC_ENDPOINT: "<minikube-ip>:30900"
+  # NOT <minikube-ip>:30900 — with the docker driver on Windows the node IP
+  # (192.168.49.2) is unreachable from the host and `minikube tunnel` only
+  # covers LoadBalancer/Ingress, never NodePort (see docs/19). Instead the
+  # browser reaches MinIO through a kubectl port-forward started by
+  # scripts/portforward.ps1 (localhost:30900 -> minio-service:9000).
+  MINIO_PUBLIC_ENDPOINT: "localhost:30900"
   MINIO_BUCKET: "forum-files"
   MINIO_SECURE: "false"
   FILE_DOWNLOAD_URL_TTL_SECONDS: "3600"

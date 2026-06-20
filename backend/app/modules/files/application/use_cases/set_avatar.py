@@ -72,9 +72,7 @@ class SetAvatarUseCase:
         except DomainError as exc:
             await self._storage.remove_many(file.all_storage_keys())
             return Err(exc)
-        file.attach_to(
-            owner_type=FileOwnerType.USER_AVATAR, owner_public_id=cmd.user_public_id
-        )
+        file.attach_to(owner_type=FileOwnerType.USER_AVATAR, owner_public_id=cmd.user_public_id)
 
         old_keys: tuple[str, ...] = ()
         async with self._uow as uow:

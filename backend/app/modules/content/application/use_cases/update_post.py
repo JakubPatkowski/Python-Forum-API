@@ -37,9 +37,7 @@ class UpdatePostUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: UpdatePostCommand
-    ) -> Result[PostSummary, DomainError]:
+    async def execute(self, cmd: UpdatePostCommand) -> Result[PostSummary, DomainError]:
         post_id = PostId(cmd.post_public_id)
         actor_id = UserId(cmd.actor_public_id)
 
@@ -52,9 +50,7 @@ class UpdatePostUseCase:
 
             category_id: CategoryId | None = post.category_id
             if cmd.category_public_id is not None:
-                category = await uow.categories.get(
-                    CategoryId(cmd.category_public_id)
-                )
+                category = await uow.categories.get(CategoryId(cmd.category_public_id))
                 if category is None:
                     return Err(CategoryNotFound(str(cmd.category_public_id)))
                 category_id = category.id

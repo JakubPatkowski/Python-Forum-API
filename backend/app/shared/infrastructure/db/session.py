@@ -15,12 +15,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import settings
 
 # Engine is process-wide. Pool size kept moderate for k8s replicas * pool_size
-# vs. Postgres max_connections.
+# vs. Postgres max_connections -- values are configurable via env (see
+# config.py: DB_POOL_*; the budget is sized against HPA maxReplicas).
 engine: Final[Engine] = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT_SECONDS,
+    pool_recycle=settings.DB_POOL_RECYCLE_SECONDS,
     future=True,
 )
 

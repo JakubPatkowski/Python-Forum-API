@@ -106,9 +106,7 @@ async def login(
     response: Response,
     uc: Annotated[LoginUseCase, Depends(get_login_uc)],
 ) -> TokenResponse:
-    cmd = body.to_command(
-        user_agent=user_agent(request), ip_address=client_ip(request)
-    )
+    cmd = body.to_command(user_agent=user_agent(request), ip_address=client_ip(request))
     result = await uc.execute(cmd)
     _raise_if_error(result)
     pair = result.value  # type: ignore[union-attr]
@@ -176,9 +174,7 @@ async def logout(
     uc: Annotated[LogoutUseCase, Depends(get_logout_uc)],
     refresh_cookie: Annotated[str | None, Cookie(alias=settings.REFRESH_COOKIE_NAME)] = None,
 ) -> Response:
-    await uc.execute(
-        LogoutCommand(refresh_token=refresh_cookie, user_public_id=user.public_id)
-    )
+    await uc.execute(LogoutCommand(refresh_token=refresh_cookie, user_public_id=user.public_id))
     _clear_refresh_cookie(response)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -1,0 +1,80 @@
+# Supply-chain & configuration security scanning.
+#
+# Two independent scanners, both reporting via SARIF to the Security tab (no
+# email/chat notifications):
+#   * Trivy — dependency vulnerabilities (uv.lock, pnpm-lock), leaked secrets,
+#     and IaC misconfigurations (Dockerfiles + Kubernetes manifests).
+#   * Gitleaks — secret scanning across the full git history.
+#
+# Both tools are run from the official binary/image (NOT the marketplace
+# actions) and never fail the build (--exit-code 0): the goal is visibility,
+# not a hard gate. This also sidesteps the March 2026 supply-chain compromise
+# of the aquasecurity/* marketplace tags — pin tool versions / image digests
+# for additional hardening.
+name: Security Scan
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trivy:
+    name: Trivy (vulns, secrets, IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Trivy (official install script)
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b "$RUNNER_TEMP/trivy-bin"
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+
+      - name: Trivy scan (filesystem — deps, secrets, misconfig)
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --severity CRITICAL,HIGH,MEDIUM \
+            --format sarif --output trivy-results.sarif \
+            --exit-code 0 \
+            .
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  gitleaks:
+    name: Gitleaks (secret history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so historical secrets are detected
+
+      - name: Run Gitleaks (official image)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest \
+            detect --source /repo --redact \
+            --report-format sarif --report-path /repo/gitleaks.sarif \
+            --exit-code 0
+
+      - name: Upload Gitleaks results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks

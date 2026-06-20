@@ -23,9 +23,7 @@ class CreateCategoryUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: CreateCategoryCommand
-    ) -> Result[CategorySummary, DomainError]:
+    async def execute(self, cmd: CreateCategoryCommand) -> Result[CategorySummary, DomainError]:
         name = cmd.name.strip()
         slug = Slug(cmd.slug) if cmd.slug else Slug.from_text(name)
 

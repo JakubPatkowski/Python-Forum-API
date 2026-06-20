@@ -21,9 +21,7 @@ class ListMyFilesUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, query: ListMyFilesQuery
-    ) -> Result[list[FileView], DomainError]:
+    async def execute(self, query: ListMyFilesQuery) -> Result[list[FileView], DomainError]:
         async with self._uow as uow:
             files = await uow.files.list_by_uploader(
                 query.uploader_public_id,

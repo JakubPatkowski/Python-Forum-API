@@ -1,0 +1,55 @@
+# Frontend CI — install (frozen lockfile), lint (ESLint flat config), build.
+# The committed pnpm-lock.yaml makes installs reproducible; the built SPA is
+# uploaded as an artifact so a reviewer can download exactly what CI produced.
+name: Frontend CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pnpm
+        # Version is taken from the "packageManager" field in package.json.
+        uses: pnpm/action-setup@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: ESLint
+        run: pnpm run lint
+      - name: Production build
+        run: pnpm run build
+      - name: Upload built SPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7

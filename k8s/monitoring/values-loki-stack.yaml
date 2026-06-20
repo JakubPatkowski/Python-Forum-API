@@ -28,20 +28,38 @@ loki:
   # persistence.enabled: true and a size.
   persistence:
     enabled: false
+  # FAILURE CAUSE (2026-06-13): during k6 tests the backend generates an
+  # avalanche of logs; Loki hit its 384Mi RAM / 400m CPU limit and started
+  # returning 503. Stalled Loki queries in Grafana hung for 50-100s (the
+  # dashboard log panels refreshed every 10s), which clogged Grafana and caused
+  # its restarts (SQLITE_BUSY + liveness timeout). We raise Loki's budget so it
+  # survives the log influx and responds quickly -> Grafana stops choking.
   resources:
     requests:
-      cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "400m"
+      cpu: "150m"
       memory: "384Mi"
-  # Ograniczamy tempo przyjmowania logow, zeby Loki nie puchl podczas testow
-  # obciazeniowych (k6 generuje DUZO logow z backendu). Te klucze sa stabilne
-  # we wszystkich wersjach Loki z chartu loki-stack i bezpiecznie sie mergeuja
-  # z domyslna konfiguracja chartu (nie nadpisuja calych sekcji storage/schema).
+    limits:
+      cpu: "800m"
+      memory: "768Mi"
+  # Looser probes: the default timeouts (1s) fell into 503/timeout when Loki was
+  # busy indexing the k6 influx, which made the kubelet restart it in a loop.
+  livenessProbe:
+    initialDelaySeconds: 60
+    timeoutSeconds: 10
+    failureThreshold: 10
+    periodSeconds: 15
+  readinessProbe:
+    initialDelaySeconds: 45
+    timeoutSeconds: 10
+    failureThreshold: 10
+    periodSeconds: 15
+  # Throttle the log ingestion rate so Loki doesn't balloon during load tests
+  # (k6 generates A LOT of backend logs). These keys are stable across all Loki
+  # versions in the loki-stack chart and merge safely with the chart's default
+  # config (they don't overwrite whole storage/schema sections).
   config:
     limits_config:
-      # Twardszy limit na ingest - chroni Loki przed zalaniem logami z k6.
+      # A harder ingest limit - protects Loki from being flooded by k6 logs.
       ingestion_rate_mb: 8
       ingestion_burst_size_mb: 16
       reject_old_samples: true

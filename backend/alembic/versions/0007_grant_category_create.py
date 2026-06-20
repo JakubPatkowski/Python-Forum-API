@@ -5,9 +5,9 @@ Revises: 0006
 Create Date: 2026-05-31 00:00:00.000000
 
 Adds the new ``category.create`` permission to the catalogue and grants it to
-every predefined role (``user`` / ``moderator`` / ``admin``). Decyzja produktowa:
-każdy zalogowany użytkownik może założyć nową kategorię; usuwanie kategorii nadal
-wymaga ``category.manage`` (moderator+). Idempotentne (``ON CONFLICT DO NOTHING``).
+every predefined role (``user`` / ``moderator`` / ``admin``). Product decision:
+any logged-in user can create a new category; deleting a category still requires
+``category.manage`` (moderator+). Idempotent (``ON CONFLICT DO NOTHING``).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 _NEW_PERMISSION = "category.create"
-# Wszystkie predefiniowane role dostają nowe uprawnienie.
+# All predefined roles get the new permission.
 _ROLES_WITH_PERMISSION: tuple[str, ...] = ("user", "moderator", "admin")
 
 
@@ -52,7 +52,7 @@ def upgrade() -> None:
             sa.text("SELECT id FROM roles WHERE name = :n"), {"n": role_name}
         ).scalar_one_or_none()
         if role_id is None:
-            continue  # rola nie istnieje (np. nietknięta baza) — pomiń
+            continue  # role does not exist (e.g. untouched database) -- skip
         bind.execute(
             sa.text(
                 "INSERT INTO role_permissions (role_id, permission_id) "

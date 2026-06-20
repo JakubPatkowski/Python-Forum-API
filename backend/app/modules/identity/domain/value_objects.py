@@ -47,9 +47,7 @@ class Email(ValueObject):
     def __post_init__(self) -> None:
         normalised = self.value.strip().lower()
         if not _EMAIL_RE.match(normalised):
-            raise ValidationError(
-                f"Invalid email address: {self.value!r}", field="email"
-            )
+            raise ValidationError(f"Invalid email address: {self.value!r}", field="email")
         # Bypass frozen restriction to store the normalised value.
         object.__setattr__(self, "value", normalised)
 
@@ -66,9 +64,7 @@ class Username(ValueObject):
     def __post_init__(self) -> None:
         v = self.value.strip()
         if len(v) < 3 or len(v) > 50:
-            raise ValidationError(
-                "Username must be between 3 and 50 characters", field="username"
-            )
+            raise ValidationError("Username must be between 3 and 50 characters", field="username")
         if not _USERNAME_RE.match(v):
             raise ValidationError(
                 "Username may contain only letters, digits and underscore",
@@ -93,13 +89,9 @@ class RawPassword(ValueObject):
 
     def __post_init__(self) -> None:
         if len(self.value) < 8:
-            raise ValidationError(
-                "Password must be at least 8 characters", field="password"
-            )
+            raise ValidationError("Password must be at least 8 characters", field="password")
         if len(self.value) > 128:
-            raise ValidationError(
-                "Password must be at most 128 characters", field="password"
-            )
+            raise ValidationError("Password must be at most 128 characters", field="password")
         if self.value.lower() in _COMMON_PASSWORDS:
             raise ValidationError("Password is too common", field="password")
 

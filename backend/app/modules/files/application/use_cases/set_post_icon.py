@@ -29,8 +29,8 @@ class SetPostIconUseCase:
     """Replace a post's icon. Authorisation (author or ``post.update.any``) is
     enforced in the router; the previous icon file is deleted to avoid orphans.
 
-    Bliźniak ``SetCategoryImageUseCase`` — różni się tylko typem właściciela
-    (``POST_ICON``) i sprawdzaną tabelą (post zamiast kategorii)."""
+    Twin of ``SetCategoryImageUseCase`` -- differs only in the owner type
+    (``POST_ICON``) and the table checked (post instead of category)."""
 
     def __init__(
         self,
@@ -54,7 +54,7 @@ class SetPostIconUseCase:
             return Err(exc)
 
         async with self._uow as uow:
-            # get_post_author zwraca None dla nieistniejącego posta.
+            # get_post_author returns None for a non-existent post.
             if await uow.get_post_author(cmd.post_public_id) is None:
                 return Err(OwnerNotFound("post", str(cmd.post_public_id)))
 
@@ -77,15 +77,11 @@ class SetPostIconUseCase:
         except DomainError as exc:
             await self._storage.remove_many(file.all_storage_keys())
             return Err(exc)
-        file.attach_to(
-            owner_type=FileOwnerType.POST_ICON, owner_public_id=cmd.post_public_id
-        )
+        file.attach_to(owner_type=FileOwnerType.POST_ICON, owner_public_id=cmd.post_public_id)
 
         old_keys: tuple[str, ...] = ()
         async with self._uow as uow:
-            old_public_id = await uow.current_post_icon_file_public_id(
-                cmd.post_public_id
-            )
+            old_public_id = await uow.current_post_icon_file_public_id(cmd.post_public_id)
             await uow.files.add(file)
             events = list(file.pull_events())
             if old_public_id is not None and old_public_id != file.id.value:
@@ -100,9 +96,7 @@ class SetPostIconUseCase:
 
         if old_keys:
             await self._storage.remove_many(old_keys)
-        events.append(
-            PostIconChanged(post_id=cmd.post_public_id, file_id=file.id.value)
-        )
+        events.append(PostIconChanged(post_id=cmd.post_public_id, file_id=file.id.value))
         for event in events:
             await self._bus.publish(event)
         return Ok(view)

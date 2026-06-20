@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1180" height="760" viewBox="0 0 1180 760" xmlns="http://www.w3.org/2000/svg">
+<style><![CDATA[
+  svg{background:#0d1117;border-radius:14px}
+  .title{fill:#e6edf3;font-size:30px;font-weight:700;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .subtitle{fill:#8b949e;font-size:15px;font-style:italic;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .mod-title{font-size:20px;font-weight:700;fill:#fff;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .mod-line{font-size:14px;fill:#e6edf3;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .layer-title{font-size:16px;font-weight:700;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .layer-line{font-size:13px;fill:#8b949e;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .bus-text{font-size:18px;font-weight:700;fill:#fff;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .plan{font-size:12.5px;font-style:italic;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+]]></style>
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#8b949e"/>
+    </marker>
+  </defs>
+
+  <text x="590" y="56" text-anchor="middle" class="title">Modular monolith &#8212; application modules</text>
+  <text x="590" y="86" text-anchor="middle" class="subtitle">FastAPI create_app() mounts /api/v1/* routers + in-memory Event Bus</text>
+
+  <!-- Arrows drawn FIRST so the shared/notifications boxes (painted later) cover them: arrows pass UNDER those boxes. -->
+  <g stroke="#8b949e" stroke-width="2" fill="none">
+    <line x1="160" y1="325" x2="160" y2="612" marker-end="url(#arr)"/>
+    <line x1="425" y1="325" x2="425" y2="612" marker-end="url(#arr)"/>
+    <line x1="690" y1="325" x2="690" y2="612" marker-end="url(#arr)"/>
+    <line x1="955" y1="325" x2="955" y2="612" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- identity -->
+  <g>
+    <rect x="40" y="135" width="240" height="190" rx="12" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+    <rect x="40" y="135" width="240" height="46" rx="12" fill="#58a6ff"/>
+    <rect x="40" y="159" width="240" height="22" fill="#58a6ff"/>
+    <text x="160" y="166" text-anchor="middle" class="mod-title">identity</text>
+    <text x="160" y="215" text-anchor="middle" class="mod-line">User &#183; Role &#183; Permission</text>
+    <text x="160" y="243" text-anchor="middle" class="mod-line">RefreshToken &#183; JWT</text>
+    <text x="160" y="271" text-anchor="middle" class="mod-line">RBAC / ACL</text>
+    <text x="160" y="299" text-anchor="middle" class="mod-line">Argon2id</text>
+  </g>
+  <!-- content -->
+  <g>
+    <rect x="305" y="135" width="240" height="190" rx="12" fill="#161b22" stroke="#39c5bb" stroke-width="2"/>
+    <rect x="305" y="135" width="240" height="46" rx="12" fill="#39c5bb"/>
+    <rect x="305" y="159" width="240" height="22" fill="#39c5bb"/>
+    <text x="425" y="166" text-anchor="middle" class="mod-title">content</text>
+    <text x="425" y="215" text-anchor="middle" class="mod-line">Post &#183; Comment &#183; Category</text>
+    <text x="425" y="243" text-anchor="middle" class="mod-line">Tag &#183; materialized path</text>
+    <text x="425" y="271" text-anchor="middle" class="mod-line">FTS &#183; keyset pagination</text>
+  </g>
+  <!-- files -->
+  <g>
+    <rect x="570" y="135" width="240" height="190" rx="12" fill="#161b22" stroke="#3fb950" stroke-width="2"/>
+    <rect x="570" y="135" width="240" height="46" rx="12" fill="#3fb950"/>
+    <rect x="570" y="159" width="240" height="22" fill="#3fb950"/>
+    <text x="690" y="166" text-anchor="middle" class="mod-title">files</text>
+    <text x="690" y="215" text-anchor="middle" class="mod-line">File aggregate</text>
+    <text x="690" y="243" text-anchor="middle" class="mod-line">presigned + proxied upload</text>
+    <text x="690" y="271" text-anchor="middle" class="mod-line">MinIO &#183; Pillow</text>
+  </g>
+  <!-- engagement -->
+  <g>
+    <rect x="835" y="135" width="240" height="190" rx="12" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+    <rect x="835" y="135" width="240" height="46" rx="12" fill="#d29922"/>
+    <rect x="835" y="159" width="240" height="22" fill="#d29922"/>
+    <text x="955" y="166" text-anchor="middle" class="mod-title">engagement</text>
+    <text x="955" y="215" text-anchor="middle" class="mod-line">reactions (likes)</text>
+    <text x="955" y="243" text-anchor="middle" class="mod-line">user_stats view</text>
+    <text x="955" y="271" text-anchor="middle" class="mod-line">raw SQL</text>
+  </g>
+
+  <!-- shared (active): opaque base hides arrows behind it -->
+  <g>
+    <rect x="40" y="395" width="505" height="92" rx="10" fill="#0d1117" stroke="none"/>
+    <rect x="40" y="395" width="505" height="92" rx="10" fill="rgba(88,166,255,.08)" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="292" y="430" text-anchor="middle" class="layer-title" fill="#58a6ff">shared/</text>
+    <text x="292" y="458" text-anchor="middle" class="layer-line">domain &#183; application &#183; infrastructure &#183; presentation</text>
+  </g>
+  <!-- notifications / audit (planned): opaque base hides arrows behind it -->
+  <g>
+    <rect x="570" y="395" width="505" height="92" rx="10" fill="#0d1117" stroke="none"/>
+    <rect x="570" y="395" width="505" height="92" rx="10" fill="rgba(139,148,158,.06)" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <text x="822" y="425" text-anchor="middle" class="layer-title" fill="#8b949e">notifications &#183; audit</text>
+    <text x="822" y="448" text-anchor="middle" class="plan" fill="#8b949e">empty skeletons &#8212; not in current scope</text>
+    <text x="822" y="470" text-anchor="middle" class="plan" fill="#8b949e" font-size="12">planned: RabbitMQ &#183; WebSocket &#183; audit log</text>
+  </g>
+
+  <!-- event bus -->
+  <rect x="40" y="615" width="1035" height="86" rx="12" fill="#1f2940" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="557" y="650" text-anchor="middle" class="bus-text">InMemoryEventBus</text>
+  <text x="557" y="678" text-anchor="middle" class="layer-line" font-size="14">publishes domain events after commit &#183; RabbitMQ planned (Phase 4)</text>
+
+  <!-- legend -->
+  <g>
+    <rect x="40" y="724" width="20" height="14" rx="3" fill="none" stroke="#30363d" stroke-dasharray="5 4"/>
+    <text x="68" y="735" class="plan" fill="#8b949e">dashed = planned / not yet implemented</text>
+  </g>
+</svg>

@@ -35,9 +35,7 @@ class PillowFileProcessor(IFileProcessor):
         except Exception:
             return None
 
-    def make_image_variants(
-        self, data: bytes, *, sizes: dict[str, int]
-    ) -> list[ProcessedVariant]:
+    def make_image_variants(self, data: bytes, *, sizes: dict[str, int]) -> list[ProcessedVariant]:
         try:
             with Image.open(BytesIO(data)) as src:
                 src = ImageOps.exif_transpose(src)

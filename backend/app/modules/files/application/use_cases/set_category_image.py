@@ -41,9 +41,7 @@ class SetCategoryImageUseCase:
         self._processor = processor
         self._bus = bus
 
-    async def execute(
-        self, cmd: SetCategoryImageCommand
-    ) -> Result[FileView, DomainError]:
+    async def execute(self, cmd: SetCategoryImageCommand) -> Result[FileView, DomainError]:
         try:
             declared = validate_declared_type(cmd.content_type)
             if not declared.is_image:
@@ -75,15 +73,11 @@ class SetCategoryImageUseCase:
         except DomainError as exc:
             await self._storage.remove_many(file.all_storage_keys())
             return Err(exc)
-        file.attach_to(
-            owner_type=FileOwnerType.CATEGORY, owner_public_id=cmd.category_public_id
-        )
+        file.attach_to(owner_type=FileOwnerType.CATEGORY, owner_public_id=cmd.category_public_id)
 
         old_keys: tuple[str, ...] = ()
         async with self._uow as uow:
-            old_public_id = await uow.current_category_image_file_public_id(
-                cmd.category_public_id
-            )
+            old_public_id = await uow.current_category_image_file_public_id(cmd.category_public_id)
             await uow.files.add(file)
             events = list(file.pull_events())
             if old_public_id is not None and old_public_id != file.id.value:
@@ -99,9 +93,7 @@ class SetCategoryImageUseCase:
         if old_keys:
             await self._storage.remove_many(old_keys)
         events.append(
-            CategoryImageChanged(
-                category_id=cmd.category_public_id, file_id=file.id.value
-            )
+            CategoryImageChanged(category_id=cmd.category_public_id, file_id=file.id.value)
         )
         for event in events:
             await self._bus.publish(event)

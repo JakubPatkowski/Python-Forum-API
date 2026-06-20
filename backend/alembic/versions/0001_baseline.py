@@ -29,18 +29,19 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # ----- ENUM types --------------------------------------------------------
-    # Używamy postgresql.ENUM (nie sa.Enum) bo tylko dialektowy typ respektuje
-    # create_type=False i nie wywołuje _on_table_create po raz drugi.
-    # Wzorzec identyczny jak w 0002_create_identity_tables.py.
+    # We use postgresql.ENUM (not sa.Enum) because only the dialect-specific type
+    # respects create_type=False and does not call _on_table_create a second time.
+    # Same pattern as in 0002_create_identity_tables.py.
     bind = op.get_bind()
 
-    # Idempotency guard — ten baseline odwzorowuje schemat, który dawniej budował
-    # wycofany hook `Base.metadata.create_all`. Jeśli baza pochodzi z tamtej epoki
-    # (albo z przerwanego wcześniej `upgrade`) i ma już tabele, ponowne CREATE TABLE
-    # rzuciłoby DuplicateTable ("relation 'users' already exists"). Wykrywamy ten
-    # przypadek i robimy no-op, dzięki czemu `alembic upgrade head` jedynie zapisuje
-    # rewizję 0001 (efekt równoważny `alembic stamp 0001`), a kolejne migracje
-    # 0002+ dograją brakujące kolumny i tabele. Na czystej bazie po prostu tworzymy.
+    # Idempotency guard -- this baseline mirrors the schema that the retired
+    # `Base.metadata.create_all` hook used to build. If the database comes from
+    # that era (or from a previously interrupted `upgrade`) and already has the
+    # tables, re-running CREATE TABLE would raise DuplicateTable ("relation
+    # 'users' already exists"). We detect this case and no-op, so that
+    # `alembic upgrade head` only records revision 0001 (equivalent to
+    # `alembic stamp 0001`), and later migrations 0002+ add the missing columns
+    # and tables. On a clean database we simply create everything.
     if sa.inspect(bind).has_table("users"):
         return
 

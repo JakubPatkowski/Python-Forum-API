@@ -22,9 +22,7 @@ class DeleteCommentUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: DeleteCommentCommand
-    ) -> Result[None, DomainError]:
+    async def execute(self, cmd: DeleteCommentCommand) -> Result[None, DomainError]:
         comment_id = CommentId(cmd.comment_public_id)
         actor_id = UserId(cmd.actor_public_id)
 

@@ -23,9 +23,7 @@ class GetCommentTreeUseCase:
     def __init__(self, uow: IContentUnitOfWork) -> None:
         self._uow = uow
 
-    async def execute(
-        self, post_public_id: UUID
-    ) -> Result[list[CommentSummary], DomainError]:
+    async def execute(self, post_public_id: UUID) -> Result[list[CommentSummary], DomainError]:
         async with self._uow as uow:
             # Use the lightweight summary projection instead of hydrating the
             # full Post aggregate (category + tags + author) — we only need to

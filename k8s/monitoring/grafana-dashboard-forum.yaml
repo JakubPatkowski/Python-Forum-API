@@ -21,7 +21,7 @@ data:
       "editable": true,
       "graphTooltip": 1,
       "time": { "from": "now-30m", "to": "now" },
-      "refresh": "10s",
+      "refresh": "1m",
       "title": "Forum Overview",
       "uid": "forum-overview",
       "schemaVersion": 39,

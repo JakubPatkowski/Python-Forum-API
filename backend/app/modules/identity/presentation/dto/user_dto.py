@@ -46,8 +46,7 @@ class GrantPermissionRequest(BaseModel):
     granted: bool = Field(
         default=True,
         description=(
-            "true => override grants the permission; "
-            "false => override denies it (deny wins)."
+            "true => override grants the permission; false => override denies it (deny wins)."
         ),
     )
 

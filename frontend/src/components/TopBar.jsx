@@ -123,10 +123,6 @@ export function TopBar({ navOpen = false, onToggleNav }) {
   );
 }
 
-function initials(username) {
-  if (!username) return '??';
-  return username.slice(0, 2).toUpperCase();
-}
 
 function UserMenu({ t, user, onClose }) {
   const navigate = useNavigate();

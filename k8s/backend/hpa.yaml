@@ -19,8 +19,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: backend
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 1
+  maxReplicas: 3
   metrics:
     # Scale out when average CPU across pods exceeds 70% of the 100m request.
     - type: Resource
@@ -29,13 +29,13 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
-    # Also react to memory pressure (80% of the 128Mi request).
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
+    # MEMORY METRIC REMOVED (2026-06-13): an idle FastAPI backend holds ~256Mi,
+    # while the request is 128Mi -> memory utilization is a CONSTANT ~200%
+    # regardless of traffic. The HPA saw 202%/80% the whole time and NEVER
+    # scaled below 3 replicas after a test. Application memory is flat (it does
+    # not grow with request count), so it is a bad autoscaling signal. We scale
+    # on CPU only, which actually reacts to traffic and lets us return to a
+    # single replica after the peak.
   behavior:
     scaleUp:
       # React quickly to load spikes (good for a live demo).

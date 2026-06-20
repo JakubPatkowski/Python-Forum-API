@@ -27,9 +27,7 @@ class RequestUploadUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, cmd: RequestUploadCommand
-    ) -> Result[UploadTicket, DomainError]:
+    async def execute(self, cmd: RequestUploadCommand) -> Result[UploadTicket, DomainError]:
         try:
             declared = validate_declared_type(cmd.content_type)
             enforce_size(cmd.size_bytes)

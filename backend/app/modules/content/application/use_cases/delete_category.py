@@ -21,9 +21,7 @@ class DeleteCategoryUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: DeleteCategoryCommand
-    ) -> Result[None, DomainError]:
+    async def execute(self, cmd: DeleteCategoryCommand) -> Result[None, DomainError]:
         category_id = CategoryId(cmd.category_public_id)
         async with self._uow as uow:
             category = await uow.categories.get(category_id)

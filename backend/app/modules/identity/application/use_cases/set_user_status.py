@@ -16,16 +16,12 @@ class SetUserStatusUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: SetUserStatusCommand
-    ) -> Result[None, DomainError]:
+    async def execute(self, cmd: SetUserStatusCommand) -> Result[None, DomainError]:
         async with self._uow as uow:
             user = await uow.users.get(UserId(cmd.target_user_public_id))
             if user is None:
                 return Err(UserNotFound(str(cmd.target_user_public_id)))
-            actor = (
-                UserId(cmd.by_user_public_id) if cmd.by_user_public_id else None
-            )
+            actor = UserId(cmd.by_user_public_id) if cmd.by_user_public_id else None
             if cmd.blocked:
                 user.block(by=actor)
                 # Revoke all sessions when blocking.

@@ -45,38 +45,29 @@ class SqlAlchemyUserRepository(IUserRepository):
     # --- read --------------------------------------------------------------
 
     async def get(self, id_: UserId) -> User | None:
-        row = self._session.scalar(
-            select(UserOrm).where(UserOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(UserOrm).where(UserOrm.public_id == id_.value))
         return await self._hydrate(row) if row else None
 
     async def get_by_username(self, username: Username) -> User | None:
-        row = self._session.scalar(
-            select(UserOrm).where(UserOrm.username == username.value)
-        )
+        row = self._session.scalar(select(UserOrm).where(UserOrm.username == username.value))
         return await self._hydrate(row) if row else None
 
     async def get_by_email(self, email: Email) -> User | None:
-        row = self._session.scalar(
-            select(UserOrm).where(UserOrm.email == email.value)
-        )
+        row = self._session.scalar(select(UserOrm).where(UserOrm.email == email.value))
         return await self._hydrate(row) if row else None
 
     async def get_by_username_or_email(self, value: str) -> User | None:
         normalised = value.strip()
         row = self._session.scalar(
             select(UserOrm).where(
-                (UserOrm.username == normalised)
-                | (UserOrm.email == normalised.lower())
+                (UserOrm.username == normalised) | (UserOrm.email == normalised.lower())
             )
         )
         return await self._hydrate(row) if row else None
 
     async def exists(self, id_: UserId) -> bool:
         return (
-            self._session.scalar(
-                select(UserOrm.id).where(UserOrm.public_id == id_.value)
-            )
+            self._session.scalar(select(UserOrm.id).where(UserOrm.public_id == id_.value))
             is not None
         )
 
@@ -84,9 +75,7 @@ class SqlAlchemyUserRepository(IUserRepository):
 
     async def add(self, entity: User) -> None:
         """Insert a brand-new user, then sync roles/permissions."""
-        row = self._session.scalar(
-            select(UserOrm).where(UserOrm.public_id == entity.id.value)
-        )
+        row = self._session.scalar(select(UserOrm).where(UserOrm.public_id == entity.id.value))
         if row is None:
             row = UserOrm(
                 public_id=entity.id.value,
@@ -135,11 +124,15 @@ class SqlAlchemyUserRepository(IUserRepository):
         )
 
     def _load_user_roles(self, user_id: int) -> list[Role]:
-        role_rows = self._session.execute(
-            select(RoleOrm)
-            .join(UserRoleOrm, UserRoleOrm.role_id == RoleOrm.id)
-            .where(UserRoleOrm.user_id == user_id)
-        ).scalars().all()
+        role_rows = (
+            self._session.execute(
+                select(RoleOrm)
+                .join(UserRoleOrm, UserRoleOrm.role_id == RoleOrm.id)
+                .where(UserRoleOrm.user_id == user_id)
+            )
+            .scalars()
+            .all()
+        )
         return [self._role_with_permissions(r) for r in role_rows]
 
     def _role_with_permissions(self, row: RoleOrm) -> Role:
@@ -193,14 +186,11 @@ class SqlAlchemyUserRepository(IUserRepository):
         }
         desired = {int(r.id.value) for r in roles}
         for role_db_id in desired - existing:
-            self._session.add(
-                UserRoleOrm(user_id=user_id_int, role_id=role_db_id)
-            )
+            self._session.add(UserRoleOrm(user_id=user_id_int, role_id=role_db_id))
         for role_db_id in existing - desired:
             self._session.execute(
                 UserRoleOrm.__table__.delete().where(
-                    (UserRoleOrm.user_id == user_id_int)
-                    & (UserRoleOrm.role_id == role_db_id)
+                    (UserRoleOrm.user_id == user_id_int) & (UserRoleOrm.role_id == role_db_id)
                 )
             )
 
@@ -218,9 +208,7 @@ class SqlAlchemyUserRepository(IUserRepository):
 
         # Drop existing overrides and re-insert; small set, simple algorithm.
         self._session.execute(
-            UserPermissionOrm.__table__.delete().where(
-                UserPermissionOrm.user_id == user_id_int
-            )
+            UserPermissionOrm.__table__.delete().where(UserPermissionOrm.user_id == user_id_int)
         )
         for code in granted | denied:
             pid = codes_to_ids.get(code)

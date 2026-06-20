@@ -96,10 +96,7 @@ class FileResponse(BaseModel):
             updated_at=v.updated_at,
             url=v.url,
             download_url=v.download_url,
-            variants={
-                name: VariantResponse.from_view(var)
-                for name, var in v.variants.items()
-            },
+            variants={name: VariantResponse.from_view(var) for name, var in v.variants.items()},
         )
 
 

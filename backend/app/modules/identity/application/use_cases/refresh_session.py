@@ -53,9 +53,7 @@ class RefreshSessionUseCase:
         self._tokens = tokens
         self._bus = bus
 
-    async def execute(
-        self, cmd: RefreshSessionCommand
-    ) -> Result[TokenPair, DomainError]:
+    async def execute(self, cmd: RefreshSessionCommand) -> Result[TokenPair, DomainError]:
         claims = self._tokens.decode_refresh(cmd.refresh_token)
         if claims is None:
             return Err(InvalidRefreshToken())

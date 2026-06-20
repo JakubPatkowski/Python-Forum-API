@@ -1,47 +1,58 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Wartość-pułapka: jeśli SECRET_KEY ma tę wartość poza trybem DEBUG, aplikacja
-# odmawia startu (patrz walidator poniżej). Chroni przed wypuszczeniem buildu
-# z domyślnym, publicznie znanym kluczem JWT.
-_INSECURE_SECRET_KEY = "zmien-ten-klucz-na-produkcji"
+# Sentinel value: if SECRET_KEY equals this outside DEBUG mode, the app refuses
+# to start (see the validator below). Guards against shipping a build with the
+# default, publicly known JWT key.
+_INSECURE_SECRET_KEY = "change-this-key-in-production"
 
 
 class Settings(BaseSettings):
-    """Konfiguracja aplikacji ładowana z env / pliku .env."""
+    """Application configuration loaded from env / .env file."""
 
-    # Baza danych — psycopg3 jest jedynym sterownikiem w runtime,
-    # więc DSN musi zaczynać się od postgresql+psycopg://.
-    DATABASE_URL: str = (
-        "postgresql+psycopg://postgres:postgres@localhost:5432/forum_wedkarskie"
-    )
+    # Database: psycopg3 is the only runtime driver, so the DSN must start
+    # with postgresql+psycopg://.
+    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/forum_wedkarskie"
+
+    # SQLAlchemy connection pool. Budget: replicas_max(HPA=3) * (size + overflow)
+    # must fit within Postgres max_connections (default 100, minus headroom for
+    # pgAdmin/migrations). 3 * (10+10) = 60 -> safe.
+    # Previous defaults (5+10) were exhausted at ~150 VU (a 30 s timeout blocked
+    # the event loop and broke /health/ready -- see docs/20).
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
+    # Short timeout = fast 5xx error instead of 30 s of hanging requests
+    # (and readiness probes) when the pool is exhausted.
+    DB_POOL_TIMEOUT_SECONDS: int = 5
+    # Refresh connections every 30 min (prevents holding dead sockets).
+    DB_POOL_RECYCLE_SECONDS: int = 1800
 
     # JWT
-    SECRET_KEY: str = "zmien-ten-klucz-na-produkcji"
+    SECRET_KEY: str = "change-this-key-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
     REFRESH_COOKIE_NAME: str = "refresh_token"
     REFRESH_COOKIE_SECURE: bool = False  # set True behind HTTPS
 
-    # Aplikacja
+    # Application
     APP_NAME: str = "Forum Wędkarskie API"
     DEBUG: bool = False
 
-    # CORS — jawne originy wymagane przy allow_credentials=True
-    # (wildcard "*" + credentials jest odrzucany przez przeglądarki).
+    # CORS -- explicit origins required when allow_credentials=True
+    # (wildcard "*" + credentials is rejected by browsers).
     CORS_ALLOW_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://forum.local",
     ]
 
-    # Komentarze
+    # Comments
     MAX_COMMENT_DEPTH: int = 5
 
-    # Uploady plików — limity i whitelista typów (moduł files / faza 3).
+    # File uploads -- limits and a MIME type whitelist (files module / phase 3).
     UPLOAD_DIR: str = "/app/uploads"
-    MAX_UPLOAD_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB (wideo bywa większe)
+    MAX_UPLOAD_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB (video can be larger)
     ALLOWED_MIME_TYPES: list[str] = [
         "image/jpeg",
         "image/png",
@@ -81,7 +92,7 @@ class Settings(BaseSettings):
         "application/x-msdownload",
     ]
 
-    # --- MinIO / S3 object storage (moduł files) ---------------------------
+    # --- MinIO / S3 object storage (files module) -------------------------
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_PUBLIC_ENDPOINT: str = ""
     MINIO_ACCESS_KEY: str = "minioadmin"
@@ -102,23 +113,24 @@ class Settings(BaseSettings):
 
     @property
     def minio_public_endpoint(self) -> str:
-        """Endpoint do presigned URL-i — fallback na wewnętrzny endpoint."""
+        """Endpoint for presigned URLs -- falls back to the internal endpoint."""
         return self.MINIO_PUBLIC_ENDPOINT or self.MINIO_ENDPOINT
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
     @model_validator(mode="after")
     def _reject_insecure_secret_key(self) -> "Settings":
-        """Fail-fast: nie pozwól wystartować poza DEBUG z domyślnym SECRET_KEY.
+        """Fail-fast: refuse to start outside DEBUG with the default SECRET_KEY.
 
-        W K8s klucz wstrzykuje Secret `backend-secrets`; lokalnie (DEBUG=True
-        lub własny .env) słaby default jest tolerowany dla wygody developmentu.
+        In K8s the key is injected by the `backend-secrets` Secret; locally
+        (DEBUG=True or a custom .env) the weak default is tolerated for
+        development convenience.
         """
         if not self.DEBUG and self.SECRET_KEY == _INSECURE_SECRET_KEY:
             raise ValueError(
-                "SECRET_KEY ma domyslna, niebezpieczna wartosc. Ustaw losowy "
-                "SECRET_KEY w env (w K8s: Secret 'backend-secrets'; lokalnie: "
-                ".env lub DEBUG=True na czas developmentu)."
+                "SECRET_KEY has the default, insecure value. Set a random "
+                "SECRET_KEY in env (in K8s: the 'backend-secrets' Secret; "
+                "locally: .env or DEBUG=True during development)."
             )
         return self
 

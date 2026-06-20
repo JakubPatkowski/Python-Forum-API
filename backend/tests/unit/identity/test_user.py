@@ -101,9 +101,7 @@ class TestRoles:
         assert role_events and role_events[0].granted is True
         assert role_events[0].role_name == "moderator"
 
-    def test_effective_permissions_union_of_roles(
-        self, user_role: Role, mod_role: Role
-    ) -> None:
+    def test_effective_permissions_union_of_roles(self, user_role: Role, mod_role: Role) -> None:
         user = User.register(
             username=Username("jakub"),
             email=Email("jakub@example.com"),
@@ -127,10 +125,7 @@ class TestPermissionOverrides:
         user.pull_events()
         user.deny_permission(Permission("post.delete.any"))
         events = user.pull_events()
-        assert any(
-            isinstance(e, UserPermissionChanged) and e.granted is False
-            for e in events
-        )
+        assert any(isinstance(e, UserPermissionChanged) and e.granted is False for e in events)
         assert not user.has_permission("post.delete.any")
 
     def test_grant_adds_permission_not_in_role(self, user_role: Role) -> None:

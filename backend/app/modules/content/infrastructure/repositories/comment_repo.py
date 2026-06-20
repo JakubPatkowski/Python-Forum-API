@@ -54,44 +54,32 @@ class SqlAlchemyCommentRepository(ICommentRepository):
     # --- read --------------------------------------------------------------
 
     async def get(self, id_: CommentId) -> Comment | None:
-        row = self._session.scalar(
-            select(CommentOrm).where(CommentOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(CommentOrm).where(CommentOrm.public_id == id_.value))
         if row is None:
             return None
         return self._hydrate(row)
 
     async def exists(self, id_: CommentId) -> bool:
         return (
-            self._session.scalar(
-                select(CommentOrm.id).where(CommentOrm.public_id == id_.value)
-            )
+            self._session.scalar(select(CommentOrm.id).where(CommentOrm.public_id == id_.value))
             is not None
         )
 
     async def get_with_summary(self, id_: CommentId) -> CommentSummary | None:
-        row = self._session.scalar(
-            select(CommentOrm).where(CommentOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(CommentOrm).where(CommentOrm.public_id == id_.value))
         if row is None:
             return None
         return self._project_summary(row)
 
-    async def parent_path_for(
-        self, parent_id: CommentId
-    ) -> tuple[str, int] | None:
+    async def parent_path_for(self, parent_id: CommentId) -> tuple[str, int] | None:
         row = self._session.execute(
-            select(CommentOrm.path, CommentOrm.depth).where(
-                CommentOrm.public_id == parent_id.value
-            )
+            select(CommentOrm.path, CommentOrm.depth).where(CommentOrm.public_id == parent_id.value)
         ).one_or_none()
         if row is None:
             return None
         return (row[0] or "", row[1] or 0)
 
-    async def list_tree_for_post(
-        self, post_public_id: UUID
-    ) -> list[CommentSummary]:
+    async def list_tree_for_post(self, post_public_id: UUID) -> list[CommentSummary]:
         post_db_id = self._session.scalar(
             select(PostOrm.id).where(PostOrm.public_id == post_public_id)
         )
@@ -116,41 +104,31 @@ class SqlAlchemyCommentRepository(ICommentRepository):
             post_public_id_value = uuid4()
 
         # parent db id -> parent public_id, resolved in a single IN(...) query.
-        parent_db_ids = {
-            r.parent_id for r in rows if r.parent_id is not None
-        }
+        parent_db_ids = {r.parent_id for r in rows if r.parent_id is not None}
         parent_public_ids: dict[int, UUID] = {}
         if parent_db_ids:
             for cid, public_id in self._session.execute(
-                select(CommentOrm.id, CommentOrm.public_id).where(
-                    CommentOrm.id.in_(parent_db_ids)
-                )
+                select(CommentOrm.id, CommentOrm.public_id).where(CommentOrm.id.in_(parent_db_ids))
             ).all():
                 parent_public_ids[cid] = public_id
 
         # author db id -> AuthorSummary, resolved in a single IN(...) query.
-        author_db_ids = {
-            r.author_id for r in rows if r.author_id is not None
-        }
+        author_db_ids = {r.author_id for r in rows if r.author_id is not None}
         authors: dict[int, AuthorSummary] = {}
         if author_db_ids:
             for uid, public_id, username in self._session.execute(
-                select(
-                    UserOrm.id, UserOrm.public_id, UserOrm.username
-                ).where(UserOrm.id.in_(author_db_ids))
-            ).all():
-                authors[uid] = AuthorSummary(
-                    public_id=public_id, username=username
+                select(UserOrm.id, UserOrm.public_id, UserOrm.username).where(
+                    UserOrm.id.in_(author_db_ids)
                 )
+            ).all():
+                authors[uid] = AuthorSummary(public_id=public_id, username=username)
 
         return [
             comment_summary_from_row(
                 r,
                 post_public_id=post_public_id_value,
                 parent_public_id=(
-                    parent_public_ids.get(r.parent_id)
-                    if r.parent_id is not None
-                    else None
+                    parent_public_ids.get(r.parent_id) if r.parent_id is not None else None
                 ),
                 author=(
                     authors.get(
@@ -168,15 +146,9 @@ class SqlAlchemyCommentRepository(ICommentRepository):
 
     async def add(self, comment: Comment) -> None:
         """Insert a new comment and finalise its path."""
-        author_db_id = (
-            self._resolve_user_id(comment.author_id.value)
-            if comment.author_id
-            else None
-        )
+        author_db_id = self._resolve_user_id(comment.author_id.value) if comment.author_id else None
         if comment.author_id and author_db_id is None:
-            raise ValueError(
-                f"Unknown comment author {comment.author_id.value}"
-            )
+            raise ValueError(f"Unknown comment author {comment.author_id.value}")
         post_db_id = self._session.scalar(
             select(PostOrm.id).where(PostOrm.public_id == comment.post_id.value)
         )
@@ -192,9 +164,7 @@ class SqlAlchemyCommentRepository(ICommentRepository):
                 )
             ).one_or_none()
             if parent_row is None:
-                raise ValueError(
-                    f"Unknown parent comment {comment.parent_id.value}"
-                )
+                raise ValueError(f"Unknown parent comment {comment.parent_id.value}")
             parent_db_id = parent_row[0]
             parent_path = parent_row[1] or ""
 
@@ -217,9 +187,7 @@ class SqlAlchemyCommentRepository(ICommentRepository):
 
         # Assign the materialized path.
         own_segment = encode_path_segment(row.id)
-        row.path = (
-            f"{parent_path}.{own_segment}" if parent_path else own_segment
-        )
+        row.path = f"{parent_path}.{own_segment}" if parent_path else own_segment
         comment.assign_path(db_id=row.id, parent_path=parent_path or None)
         self._session.flush()
 
@@ -237,9 +205,7 @@ class SqlAlchemyCommentRepository(ICommentRepository):
 
     async def remove(self, entity: Comment) -> None:
         self._session.execute(
-            CommentOrm.__table__.delete().where(
-                CommentOrm.public_id == entity.id.value
-            )
+            CommentOrm.__table__.delete().where(CommentOrm.public_id == entity.id.value)
         )
 
     # --- helpers ------------------------------------------------------------
@@ -286,16 +252,12 @@ class SqlAlchemyCommentRepository(ICommentRepository):
 
         if row.author_id is not None:
             author_row = self._session.execute(
-                select(UserOrm.public_id, UserOrm.username).where(
-                    UserOrm.id == row.author_id
-                )
+                select(UserOrm.public_id, UserOrm.username).where(UserOrm.id == row.author_id)
             ).one_or_none()
             if author_row is None:
                 author = AuthorSummary(public_id=None, username=None)
             else:
-                author = AuthorSummary(
-                    public_id=author_row[0], username=author_row[1]
-                )
+                author = AuthorSummary(public_id=author_row[0], username=author_row[1])
         else:
             author = AuthorSummary(public_id=None, username=None)
 

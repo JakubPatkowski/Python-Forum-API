@@ -18,9 +18,7 @@ class DeleteFileUseCase:
     file that happens to be an avatar clears the avatar automatically.
     """
 
-    def __init__(
-        self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus
-    ) -> None:
+    def __init__(self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus) -> None:
         self._uow = uow
         self._storage = storage
         self._bus = bus
@@ -30,10 +28,7 @@ class DeleteFileUseCase:
             file = await uow.files.get(FileId(cmd.file_public_id))
             if file is None:
                 return Err(FileNotFound(str(cmd.file_public_id)))
-            if (
-                file.uploader_id.value != cmd.actor_public_id
-                and not cmd.actor_can_delete_any
-            ):
+            if file.uploader_id.value != cmd.actor_public_id and not cmd.actor_can_delete_any:
                 return Err(PermissionDeniedError("Not your file"))
 
             keys = file.all_storage_keys()

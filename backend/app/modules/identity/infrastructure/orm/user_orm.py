@@ -26,9 +26,7 @@ class UserRoleOrm(Base):
 
     __tablename__ = "user_roles"
 
-    user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id = Column(
         BigInteger,
         ForeignKey("roles.id", ondelete="CASCADE"),
@@ -51,9 +49,7 @@ class UserPermissionOrm(Base):
 
     __tablename__ = "user_permissions"
 
-    user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     permission_id = Column(
         BigInteger,
         ForeignKey("permissions.id", ondelete="CASCADE"),

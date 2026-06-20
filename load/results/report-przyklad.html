@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Raport testu obciążeniowego — Forum Wędkarskie</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #1a2128; --border: #2c3640;
+    --text: #e6edf3; --muted: #8b98a5; --accent: #4fc3f7;
+    --ok: #66bb6a; --warn: #ffa726; --bad: #ef5350;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 'Segoe UI', system-ui, sans-serif; padding: 24px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin: 28px 0 12px; color: var(--accent); }
+  .meta { color: var(--muted); margin-bottom: 20px; }
+  .meta b { color: var(--text); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .card .value { font-size: 24px; font-weight: 600; margin-top: 4px; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  canvas { width: 100%; height: 220px; display: block; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  .legend { display: flex; gap: 16px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+  .legend span::before { content: "\25A0\00A0"; margin-right: 4px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .verdict { margin-top: 20px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎣 Forum Wędkarskie — raport testu obciążeniowego</h1>
+  <div class="meta" id="meta"></div>
+
+  <div class="cards" id="cards"></div>
+
+  <h2>Skalowanie HPA — repliki backendu w czasie</h2>
+  <div class="panel">
+    <div class="legend"><span style="color:#4fc3f7">aktualne repliki</span><span style="color:#ffa726">pożądane (desired)</span></div>
+    <canvas id="chartReplicas" height="220"></canvas>
+    <div class="note">Schodki = HPA dokłada pody, gdy średnie CPU &gt; 70% requestu (100m). Scale-down następuje dopiero po 180 s stabilizacji.</div>
+  </div>
+
+  <h2>Zużycie zasobów — suma podów backendu</h2>
+  <div class="panel">
+    <div class="legend"><span style="color:#4fc3f7">CPU [mcores]</span><span style="color:#ab47bc">RAM [MiB]</span></div>
+    <canvas id="chartResources" height="220"></canvas>
+    <div class="note">Dane z metrics-server (kubectl top), próbkowanie co kilka sekund w trakcie testu.</div>
+  </div>
+
+  <h2>Statystyki per endpoint</h2>
+  <div class="panel">
+    <table id="endpointTable">
+      <thead><tr><th>Endpoint</th><th>Requesty</th><th>Udział</th><th>avg [ms]</th><th>p95 [ms]</th><th>max [ms]</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<script>
+// Dane wstrzykiwane przez scripts/run-load-test.ps1:
+const SUMMARY = {"profile":"demo","baseUrl":"http://backend-service:8000","state":{"testRunDurationMs":421000},"metrics":{
+"http_reqs":{"values":{"count":48211,"rate":114.5}},
+"http_req_duration":{"values":{"avg":85.2,"min":3.1,"med":61.0,"max":2410.0,"p(90)":190.4,"p(95)":287.9,"count":48211}},
+"errors":{"values":{"rate":0.0021,"passes":101,"fails":48110}},
+"checks":{"values":{"passes":48110,"fails":101}},
+"vus_max":{"values":{"max":80,"value":80}},
+"http_req_duration{endpoint:posts_list}":{"values":{"avg":110.1,"p(95)":340.2,"max":2410.0,"count":19300}},
+"http_req_duration{endpoint:post_detail}":{"values":{"avg":95.7,"p(95)":300.8,"max":1800.2,"count":6100}},
+"http_req_duration{endpoint:comments}":{"values":{"avg":88.2,"p(95)":280.1,"max":1500.0,"count":5900}},
+"http_req_duration{endpoint:categories}":{"values":{"avg":45.3,"p(95)":120.6,"max":900.4,"count":9700}},
+"http_req_duration{endpoint:tags}":{"values":{"avg":38.9,"p(95)":99.8,"max":700.1,"count":7211}}
+}}
+;
+const SAMPLES = [{"t": "12:00:00", "cur": 1, "des": 1, "cpu": null, "mem": null}, {"t": "12:00:05", "cur": 1, "des": 1, "cpu": null, "mem": null}, {"t": "12:00:10", "cur": 1, "des": 1, "cpu": null, "mem": null}, {"t": "12:00:15", "cur": 1, "des": 1, "cpu": 162, "mem": 110}, {"t": "12:00:20", "cur": 1, "des": 1, "cpu": 168, "mem": 110}, {"t": "12:00:25", "cur": 1, "des": 1, "cpu": 173, "mem": 110}, {"t": "12:00:30", "cur": 1, "des": 1, "cpu": 177, "mem": 110}, {"t": "12:00:35", "cur": 1, "des": 1, "cpu": 179, "mem": 110}, {"t": "12:00:40", "cur": 1, "des": 1, "cpu": 179, "mem": 110}, {"t": "12:00:45", "cur": 1, "des": 1, "cpu": 178, "mem": 110}, {"t": "12:00:50", "cur": 1, "des": 1, "cpu": 176, "mem": 110}, {"t": "12:00:55", "cur": 1, "des": 1, "cpu": 172, "mem": 110}, {"t": "12:01:00", "cur": 1, "des": 2, "cpu": 167, "mem": 110}, {"t": "12:01:05", "cur": 1, "des": 2, "cpu": 160, "mem": 110}, {"t": "12:01:10", "cur": 2, "des": 2, "cpu": 213, "mem": 220}, {"t": "12:01:15", "cur": 2, "des": 2, "cpu": 205, "mem": 220}, {"t": "12:01:20", "cur": 2, "des": 2, "cpu": 197, "mem": 220}, {"t": "12:01:25", "cur": 2, "des": 2, "cpu": 189, "mem": 220}, {"t": "12:01:30", "cur": 2, "des": 2, "cpu": 182, "mem": 220}, {"t": "12:01:35", "cur": 2, "des": 2, "cpu": 175, "mem": 220}, {"t": "12:01:40", "cur": 2, "des": 2, "cpu": 169, "mem": 220}, {"t": "12:01:45", "cur": 2, "des": 2, "cpu": 165, "mem": 220}, {"t": "12:01:50", "cur": 2, "des": 2, "cpu": 161, "mem": 220}, {"t": "12:01:55", "cur": 2, "des": 2, "cpu": 160, "mem": 220}, {"t": "12:02:00", "cur": 2, "des": 2, "cpu": 160, "mem": 220}, {"t": "12:02:05", "cur": 2, "des": 2, "cpu": 161, "mem": 220}, {"t": "12:02:10", "cur": 2, "des": 2, "cpu": 164, "mem": 220}, {"t": "12:02:15", "cur": 2, "des": 2, "cpu": 169, "mem": 220}, {"t": "12:02:20", "cur": 2, "des": 2, "cpu": 174, "mem": 220}, {"t": "12:02:25", "cur": 2, "des": 2, "cpu": 181, "mem": 220}, {"t": "12:02:30", "cur": 2, "des": 2, "cpu": 188, "mem": 220}, {"t": "12:02:35", "cur": 2, "des": 2, "cpu": 196, "mem": 220}, {"t": "12:02:40", "cur": 2, "des": 2, "cpu": 204, "mem": 220}, {"t": "12:02:45", "cur": 2, "des": 2, "cpu": 212, "mem": 220}, {"t": "12:02:50", "cur": 2, "des": 2, "cpu": 219, "mem": 220}, {"t": "12:02:55", "cur": 2, "des": 2, "cpu": 226, "mem": 220}, {"t": "12:03:00", "cur": 2, "des": 2, "cpu": 231, "mem": 220}, {"t": "12:03:05", "cur": 2, "des": 2, "cpu": 235, "mem": 220}, {"t": "12:03:10", "cur": 2, "des": 3, "cpu": 238, "mem": 220}, {"t": "12:03:15", "cur": 2, "des": 3, "cpu": 239, "mem": 220}, {"t": "12:03:20", "cur": 3, "des": 3, "cpu": 299, "mem": 330}, {"t": "12:03:25", "cur": 3, "des": 3, "cpu": 297, "mem": 330}, {"t": "12:03:30", "cur": 3, "des": 3, "cpu": 294, "mem": 330}, {"t": "12:03:35", "cur": 3, "des": 3, "cpu": 289, "mem": 330}, {"t": "12:03:40", "cur": 3, "des": 3, "cpu": 283, "mem": 330}, {"t": "12:03:45", "cur": 3, "des": 3, "cpu": 276, "mem": 330}, {"t": "12:03:50", "cur": 3, "des": 3, "cpu": 268, "mem": 330}, {"t": "12:03:55", "cur": 3, "des": 3, "cpu": 260, "mem": 330}, {"t": "12:04:00", "cur": 3, "des": 3, "cpu": 253, "mem": 330}, {"t": "12:04:05", "cur": 3, "des": 3, "cpu": 245, "mem": 330}, {"t": "12:04:10", "cur": 3, "des": 3, "cpu": 238, "mem": 330}, {"t": "12:04:15", "cur": 3, "des": 3, "cpu": 232, "mem": 330}, {"t": "12:04:20", "cur": 3, "des": 3, "cpu": 226, "mem": 330}, {"t": "12:04:25", "cur": 3, "des": 3, "cpu": 223, "mem": 330}, {"t": "12:04:30", "cur": 3, "des": 3, "cpu": 220, "mem": 330}, {"t": "12:04:35", "cur": 3, "des": 3, "cpu": 220, "mem": 330}, {"t": "12:04:40", "cur": 3, "des": 3, "cpu": 220, "mem": 330}, {"t": "12:04:45", "cur": 3, "des": 3, "cpu": 223, "mem": 330}, {"t": "12:04:50", "cur": 3, "des": 3, "cpu": 227, "mem": 330}, {"t": "12:04:55", "cur": 3, "des": 3, "cpu": 232, "mem": 330}, {"t": "12:05:00", "cur": 3, "des": 3, "cpu": 238, "mem": 330}, {"t": "12:05:05", "cur": 3, "des": 3, "cpu": 245, "mem": 330}, {"t": "12:05:10", "cur": 3, "des": 3, "cpu": 253, "mem": 330}, {"t": "12:05:15", "cur": 3, "des": 3, "cpu": 261, "mem": 330}, {"t": "12:05:20", "cur": 3, "des": 3, "cpu": 269, "mem": 330}, {"t": "12:05:25", "cur": 3, "des": 3, "cpu": 276, "mem": 330}, {"t": "12:05:30", "cur": 3, "des": 3, "cpu": 283, "mem": 330}, {"t": "12:05:35", "cur": 3, "des": 3, "cpu": 289, "mem": 330}, {"t": "12:05:40", "cur": 3, "des": 3, "cpu": 294, "mem": 330}, {"t": "12:05:45", "cur": 3, "des": 3, "cpu": 297, "mem": 330}, {"t": "12:05:50", "cur": 3, "des": 3, "cpu": 299, "mem": 330}, {"t": "12:05:55", "cur": 3, "des": 3, "cpu": 299, "mem": 330}, {"t": "12:06:00", "cur": 3, "des": 3, "cpu": 298, "mem": 330}, {"t": "12:06:05", "cur": 3, "des": 3, "cpu": 295, "mem": 330}, {"t": "12:06:10", "cur": 3, "des": 3, "cpu": 291, "mem": 330}, {"t": "12:06:15", "cur": 3, "des": 3, "cpu": 286, "mem": 330}, {"t": "12:06:20", "cur": 3, "des": 3, "cpu": 279, "mem": 330}, {"t": "12:06:25", "cur": 3, "des": 3, "cpu": 272, "mem": 330}, {"t": "12:06:30", "cur": 3, "des": 3, "cpu": 264, "mem": 330}, {"t": "12:06:35", "cur": 3, "des": 3, "cpu": 256, "mem": 330}, {"t": "12:06:40", "cur": 3, "des": 3, "cpu": 248, "mem": 330}, {"t": "12:06:45", "cur": 3, "des": 3, "cpu": 241, "mem": 330}, {"t": "12:06:50", "cur": 3, "des": 3, "cpu": 234, "mem": 330}, {"t": "12:06:55", "cur": 3, "des": 3, "cpu": 228, "mem": 330}, {"t": "12:07:00", "cur": 3, "des": 3, "cpu": 224, "mem": 330}];
+const GENERATED_AT = "2026-06-11 12:00";
+
+const m = SUMMARY.metrics || {};
+const val = (name, key) => (m[name] && m[name].values && m[name].values[key] !== undefined) ? m[name].values[key] : null;
+const fmt = (v, d=1) => v === null || v === undefined ? "–" : Number(v).toFixed(d);
+
+// --- Meta ---
+const durMs = SUMMARY.state && SUMMARY.state.testRunDurationMs;
+document.getElementById("meta").innerHTML =
+  `Profil: <b>${SUMMARY.profile || "?"}</b> &nbsp;|&nbsp; Cel: <b>${SUMMARY.baseUrl || "?"}</b>` +
+  ` &nbsp;|&nbsp; Czas trwania: <b>${durMs ? (durMs/60000).toFixed(1) + " min" : "–"}</b>` +
+  ` &nbsp;|&nbsp; Wygenerowano: <b>${GENERATED_AT}</b>`;
+
+// --- Karty statystyk ---
+const reqCount = val("http_reqs", "count") || 0;
+const reqRate = val("http_reqs", "rate");
+const p95 = val("http_req_duration", "p(95)");
+const avg = val("http_req_duration", "avg");
+const errRate = (val("errors", "rate") || 0) * 100;
+const checksOk = val("checks", "passes") || 0;
+const checksFail = val("checks", "fails") || 0;
+const maxVus = val("vus_max", "max") || val("vus_max", "value");
+const maxReplicas = SAMPLES.length ? Math.max(...SAMPLES.map(s => s.cur || 0)) : null;
+
+const errClass = errRate < 1 ? "ok" : (errRate < 5 ? "warn" : "bad");
+const p95Class = p95 === null ? "" : (p95 < 500 ? "ok" : (p95 < 1500 ? "warn" : "bad"));
+
+document.getElementById("cards").innerHTML = [
+  { label: "Requesty", value: reqCount.toLocaleString("pl-PL"), sub: fmt(reqRate) + " req/s" },
+  { label: "Latencja p95", value: fmt(p95) + " ms", sub: "avg " + fmt(avg) + " ms", cls: p95Class },
+  { label: "Błędy", value: fmt(errRate, 2) + "%", sub: checksFail + " nieudanych checków", cls: errClass },
+  { label: "Checki OK", value: ((checksOk / Math.max(1, checksOk + checksFail)) * 100).toFixed(1) + "%", sub: checksOk.toLocaleString("pl-PL") + " / " + (checksOk + checksFail).toLocaleString("pl-PL"), cls: "ok" },
+  { label: "Max VUs", value: maxVus !== null ? maxVus : "–", sub: "wirtualni użytkownicy" },
+  { label: "Max replik", value: maxReplicas !== null ? maxReplicas : "–", sub: "backend (HPA)" },
+].map(c => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls||""}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+
+// --- Prosty wykres liniowy na canvas (bez zależności zewnętrznych) ---
+function drawChart(canvasId, series, opts) {
+  const cv = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = 220;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const padL = 44, padR = 10, padT = 10, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = Math.max(...series.map(s => s.data.length));
+  if (n < 2) { ctx.fillStyle = "#8b98a5"; ctx.fillText("Brak próbek (test bez monitoringu HPA)", padL, H/2); return; }
+  const allVals = series.flatMap(s => s.data).filter(v => v !== null);
+  let maxY = Math.max(...allVals, opts && opts.minMax || 1);
+  maxY = Math.ceil(maxY * 1.15);
+  const x = i => padL + (i / (n - 1)) * plotW;
+  const y = v => padT + plotH - (v / maxY) * plotH;
+  // siatka + osie
+  ctx.strokeStyle = "#2c3640"; ctx.fillStyle = "#8b98a5"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+  for (let g = 0; g <= 4; g++) {
+    const gy = padT + (plotH * g) / 4;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(W - padR, gy); ctx.stroke();
+    ctx.fillText(String(Math.round(maxY * (1 - g / 4))), padL - 6, gy + 4);
+  }
+  // etykiety czasu (5 punktów)
+  ctx.textAlign = "center";
+  const labels = SAMPLES.map(s => s.t);
+  for (let li = 0; li < 5; li++) {
+    const i = Math.round((n - 1) * li / 4);
+    if (labels[i]) ctx.fillText(labels[i], x(i), H - 6);
+  }
+  // serie
+  for (const s of series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+    if (s.dash) ctx.setLineDash([5, 4]); else ctx.setLineDash([]);
+    ctx.beginPath();
+    let started = false;
+    s.data.forEach((v, i) => {
+      if (v === null) return;
+      const px = x(i), py = y(v);
+      if (!started) { ctx.moveTo(px, py); started = true; }
+      else if (s.step) { ctx.lineTo(px, ctx.lastY ?? py); ctx.lineTo(px, py); }
+      else ctx.lineTo(px, py);
+      ctx.lastY = py;
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+drawChart("chartReplicas", [
+  { data: SAMPLES.map(s => s.cur ?? null), color: "#4fc3f7", step: true },
+  { data: SAMPLES.map(s => s.des ?? null), color: "#ffa726", step: true, dash: true },
+], { minMax: 3 });
+
+drawChart("chartResources", [
+  { data: SAMPLES.map(s => s.cpu ?? null), color: "#4fc3f7" },
+  { data: SAMPLES.map(s => s.mem ?? null), color: "#ab47bc" },
+]);
+
+// --- Tabela per endpoint ---
+const tbody = document.querySelector("#endpointTable tbody");
+const epRows = [];
+for (const key of Object.keys(m)) {
+  const match = key.match(/^http_req_duration\{endpoint:(\w+)\}$/);
+  if (!match) continue;
+  const v = m[key].values || {};
+  epRows.push({ name: match[1], count: v.count || 0, avg: v.avg, p95: v["p(95)"], max: v.max });
+}
+epRows.sort((a, b) => b.count - a.count);
+const totalEp = epRows.reduce((acc, r) => acc + r.count, 0) || 1;
+tbody.innerHTML = epRows.map(r =>
+  `<tr><td>${r.name}</td><td>${r.count.toLocaleString("pl-PL")}</td><td>${(100*r.count/totalEp).toFixed(1)}%</td><td>${fmt(r.avg)}</td><td>${fmt(r.p95)}</td><td>${fmt(r.max)}</td></tr>`
+).join("") || `<tr><td colspan="6">Brak submetryk per endpoint w podsumowaniu.</td></tr>`;
+
+// --- Werdykt ---
+let verdict, vClass;
+if (errRate < 1 && (p95 === null || p95 < 1000)) {
+  verdict = "✅ System obsłużył zadany ruch w granicach progów. " +
+    (maxReplicas > 1 ? `HPA doskalował backend do ${maxReplicas} replik — skalowanie poziome działa.` : "HPA nie musiał doskalowywać (niski ruch).");
+  vClass = "ok";
+} else if (errRate < 5) {
+  verdict = "⚠️ Podwyższona latencja lub pojedyncze błędy pod szczytowym obciążeniem — system na granicy wydolności przy tym profilu. Sprawdź wykresy CPU i replik.";
+  vClass = "warn";
+} else {
+  verdict = "❌ Wysoki odsetek błędów — system nie wytrzymał profilu. Sprawdź logi backendu (Loki) i pulę połączeń DB.";
+  vClass = "bad";
+}
+document.getElementById("verdict").innerHTML = `<b class="${vClass}">Werdykt:</b> ${verdict}`;
+</script>
+</body>
+</html>

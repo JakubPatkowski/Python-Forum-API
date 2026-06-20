@@ -21,9 +21,7 @@ class TestPostCursor:
         assert decoded.public_id == pid
 
     def test_encoded_is_url_safe(self) -> None:
-        c = PostCursor(
-            created_at=datetime.now(UTC), public_id=uuid4()
-        ).encode()
+        c = PostCursor(created_at=datetime.now(UTC), public_id=uuid4()).encode()
         # No padding, no plus/slash characters.
         assert "=" not in c
         assert "+" not in c
@@ -34,8 +32,6 @@ class TestPostCursor:
             PostCursor.decode("not-a-cursor")
 
     def test_decode_rejects_truncated(self) -> None:
-        good = PostCursor(
-            created_at=datetime.now(UTC), public_id=uuid4()
-        ).encode()
+        good = PostCursor(created_at=datetime.now(UTC), public_id=uuid4()).encode()
         with pytest.raises(InvalidCursor):
             PostCursor.decode(good[:5])

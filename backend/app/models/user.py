@@ -12,7 +12,7 @@ from app.database import Base
 
 
 class UserRole(str, Enum):
-    """Hierarchia ról: ADMIN > MODERATOR > USER.
+    """Role hierarchy: ADMIN > MODERATOR > USER.
 
     Legacy enum — phase 1 introduces a proper RBAC (tables ``roles``,
     ``role_permissions``, ``user_roles``). Kept until legacy routers retire.

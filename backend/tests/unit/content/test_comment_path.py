@@ -103,9 +103,7 @@ class TestCommentCreate:
     def test_max_depth_blocks_deeper_replies(self) -> None:
         post_id = PostId(uuid4())
         author = UserId(uuid4())
-        current = Comment.create(
-            post_id=post_id, author_id=author, content=_body(), max_depth=2
-        )
+        current = Comment.create(post_id=post_id, author_id=author, content=_body(), max_depth=2)
         deeper = Comment.create(
             post_id=post_id,
             author_id=author,
@@ -126,9 +124,7 @@ class TestCommentCreate:
         post_a = PostId(uuid4())
         post_b = PostId(uuid4())
         author = UserId(uuid4())
-        parent = Comment.create(
-            post_id=post_a, author_id=author, content=_body()
-        )
+        parent = Comment.create(post_id=post_a, author_id=author, content=_body())
         with pytest.raises(ValidationError):
             Comment.create(
                 post_id=post_b,
@@ -159,9 +155,7 @@ class TestSoftDelete:
     def test_replaces_body_and_marks_deleted(self) -> None:
         post_id = PostId(uuid4())
         author = UserId(uuid4())
-        c = Comment.create(
-            post_id=post_id, author_id=author, content=_body("original")
-        )
+        c = Comment.create(post_id=post_id, author_id=author, content=_body("original"))
         c.soft_delete(deleted_by=author)
         assert c.is_deleted is True
         assert c.content.body == "[deleted]"
@@ -169,9 +163,7 @@ class TestSoftDelete:
     def test_idempotent(self) -> None:
         post_id = PostId(uuid4())
         author = UserId(uuid4())
-        c = Comment.create(
-            post_id=post_id, author_id=author, content=_body("once")
-        )
+        c = Comment.create(post_id=post_id, author_id=author, content=_body("once"))
         c.soft_delete(deleted_by=author)
         # Second call must not change content or emit a duplicate event.
         events_before = len(c.pull_events())

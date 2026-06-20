@@ -54,9 +54,7 @@ class FakeStorage:
     async def ensure_bucket(self) -> None:
         return None
 
-    async def presigned_put_url(
-        self, key: str, *, content_type: str, expires_seconds: int
-    ) -> str:
+    async def presigned_put_url(self, key: str, *, content_type: str, expires_seconds: int) -> str:
         return f"https://minio.test/{key}?put=1"
 
     async def presigned_get_url(
@@ -101,9 +99,7 @@ class FakeProcessor:
     def probe_image(self, data: bytes) -> tuple[int, int] | None:
         return (800, 600)
 
-    def make_image_variants(
-        self, data: bytes, *, sizes: dict[str, int]
-    ) -> list[ProcessedVariant]:
+    def make_image_variants(self, data: bytes, *, sizes: dict[str, int]) -> list[ProcessedVariant]:
         return [
             ProcessedVariant(
                 name="thumb",
@@ -134,15 +130,11 @@ class FakeRepo:
     async def exists(self, id_: FileId) -> bool:
         return id_.value in self._store
 
-    async def list_for_owner(
-        self, owner_type: FileOwnerType, owner_public_id: UUID
-    ) -> list[File]:
+    async def list_for_owner(self, owner_type: FileOwnerType, owner_public_id: UUID) -> list[File]:
         return [
             f
             for f in self._store.values()
-            if f.owner_type is owner_type
-            and f.owner_id == owner_public_id
-            and f.is_ready
+            if f.owner_type is owner_type and f.owner_id == owner_public_id and f.is_ready
         ]
 
     async def list_by_uploader(
@@ -155,9 +147,7 @@ class FakeRepo:
         ]
         return items[offset : offset + limit]
 
-    async def list_orphans(
-        self, *, older_than: datetime, limit: int
-    ) -> list[File]:
+    async def list_orphans(self, *, older_than: datetime, limit: int) -> list[File]:
         items = [
             f
             for f in self._store.values()
@@ -208,27 +198,18 @@ class FakeUoW:
     async def category_exists(self, category_public_id: UUID) -> bool:
         return category_public_id in self.categories
 
-    async def set_user_avatar(
-        self, user_public_id: UUID, file_internal_id: int | None
-    ) -> None:
-        public = next(
-            (p for p, i in self._internal.items() if i == file_internal_id), None
-        )
+    async def set_user_avatar(self, user_public_id: UUID, file_internal_id: int | None) -> None:
+        public = next((p for p, i in self._internal.items() if i == file_internal_id), None)
         self.avatars[user_public_id] = public
 
-    async def current_avatar_file_public_id(
-        self, user_public_id: UUID
-    ) -> UUID | None:
+    async def current_avatar_file_public_id(self, user_public_id: UUID) -> UUID | None:
         return self.avatars.get(user_public_id)
 
-    async def current_category_image_file_public_id(
-        self, category_public_id: UUID
-    ) -> UUID | None:
+    async def current_category_image_file_public_id(self, category_public_id: UUID) -> UUID | None:
         matches = [
             f
             for f in self.store.values()
-            if f.owner_type is FileOwnerType.CATEGORY
-            and f.owner_id == category_public_id
+            if f.owner_type is FileOwnerType.CATEGORY and f.owner_id == category_public_id
         ]
         return matches[-1].id.value if matches else None
 
@@ -445,9 +426,7 @@ class TestPresignedFlow:
 
         comp = CompleteUploadUseCase(uow, storage, FakeProcessor(), bus)
         done = await comp.execute(
-            CompleteUploadCommand(
-                file_public_id=ticket.file_id, actor_public_id=uploader
-            )
+            CompleteUploadCommand(file_public_id=ticket.file_id, actor_public_id=uploader)
         )
         assert isinstance(done, Ok)
         assert done.value.status == FileStatus.READY.value
@@ -470,9 +449,7 @@ class TestPresignedFlow:
 
         comp = CompleteUploadUseCase(uow, storage, FakeProcessor(), bus)
         result = await comp.execute(
-            CompleteUploadCommand(
-                file_public_id=ticket.file_id, actor_public_id=uploader
-            )
+            CompleteUploadCommand(file_public_id=ticket.file_id, actor_public_id=uploader)
         )
         assert isinstance(result, Err)
         assert result.error.http_status == 409

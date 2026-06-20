@@ -30,7 +30,7 @@ class Category(Base):
     )
 
     # --- engagement (ownership) -------------------------------------------- #
-    # Twórca kategorii — pozwala zwykłemu userowi zarządzać ikoną swojej kategorii.
+    # Category creator -- lets a regular user manage the icon of their own category.
     owner_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )

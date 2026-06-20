@@ -74,9 +74,7 @@ def _user_int_id(db: Session, public_id: UUID) -> int:
         {"pid": str(public_id)},
     ).first()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return int(row[0])
 
 
@@ -84,10 +82,7 @@ def _like_state(
     db: Session, target_type: str, target_id: int, user_int_id: int | None
 ) -> LikeStateResponse:
     count = db.execute(
-        text(
-            "SELECT COUNT(*) FROM reactions "
-            "WHERE target_type = :tt AND target_id = :tid"
-        ),
+        text("SELECT COUNT(*) FROM reactions WHERE target_type = :tt AND target_id = :tid"),
         {"tt": target_type, "tid": target_id},
     ).scalar_one()
     liked = False
@@ -135,8 +130,7 @@ def _remove_like(
     uid = _user_int_id(db, user.public_id)
     db.execute(
         text(
-            "DELETE FROM reactions "
-            "WHERE user_id = :uid AND target_type = :tt AND target_id = :tid"
+            "DELETE FROM reactions WHERE user_id = :uid AND target_type = :tt AND target_id = :tid"
         ),
         {"uid": uid, "tt": target_type, "tid": target_id},
     )
@@ -166,9 +160,7 @@ def unlike_post(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateR
 
 
 @router.get("/posts/{public_id}/likes", response_model=LikeStateResponse)
-def post_likes(
-    public_id: UUID, db: DbSession, user: OptionalCurrentUser
-) -> LikeStateResponse:
+def post_likes(public_id: UUID, db: DbSession, user: OptionalCurrentUser) -> LikeStateResponse:
     return _read_likes(db, "post", public_id, user)
 
 
@@ -176,23 +168,17 @@ def post_likes(
 
 
 @router.post("/comments/{public_id}/like", response_model=LikeStateResponse)
-def like_comment(
-    public_id: UUID, db: DbSession, user: CurrentUser
-) -> LikeStateResponse:
+def like_comment(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateResponse:
     return _add_like(db, "comment", public_id, user)
 
 
 @router.delete("/comments/{public_id}/like", response_model=LikeStateResponse)
-def unlike_comment(
-    public_id: UUID, db: DbSession, user: CurrentUser
-) -> LikeStateResponse:
+def unlike_comment(public_id: UUID, db: DbSession, user: CurrentUser) -> LikeStateResponse:
     return _remove_like(db, "comment", public_id, user)
 
 
 @router.get("/comments/{public_id}/likes", response_model=LikeStateResponse)
-def comment_likes(
-    public_id: UUID, db: DbSession, user: OptionalCurrentUser
-) -> LikeStateResponse:
+def comment_likes(public_id: UUID, db: DbSession, user: OptionalCurrentUser) -> LikeStateResponse:
     return _read_likes(db, "comment", public_id, user)
 
 
@@ -214,10 +200,7 @@ def featured_post(
     params: dict[str, str] = {}
     cat_clause = ""
     if category_id is not None:
-        cat_clause = (
-            "AND p.category_id = "
-            "(SELECT id FROM categories WHERE public_id = :cid)"
-        )
+        cat_clause = "AND p.category_id = (SELECT id FROM categories WHERE public_id = :cid)"
         params["cid"] = str(category_id)
 
     row = db.execute(
@@ -259,12 +242,8 @@ def user_stats(user_id: UUID, db: DbSession) -> UserStatsResponse:
             {"pid": str(user_id)},
         ).first()
         if exists is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-        return UserStatsResponse(
-            posts_count=0, comments_count=0, likes_received=0
-        )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return UserStatsResponse(posts_count=0, comments_count=0, likes_received=0)
     return UserStatsResponse(
         posts_count=int(row[0]),
         comments_count=int(row[1]),

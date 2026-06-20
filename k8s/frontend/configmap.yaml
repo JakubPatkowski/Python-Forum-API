@@ -10,6 +10,11 @@ data:
         root /usr/share/nginx/html;
         index index.html;
 
+        # Uploads up to 25 MB (MAX_UPLOAD_SIZE_BYTES) pass through this proxy —
+        # nginx's default limit is 1 MB, so any larger file got a 413 before
+        # the request reached the backend. Headroom matches the ingress (30m).
+        client_max_body_size 30m;
+
         # In k8s the backend-service ClusterIP is stable — no resolver trick needed.
         location /api/ {
             proxy_pass http://backend-service:8000;

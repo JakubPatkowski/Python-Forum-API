@@ -52,17 +52,13 @@ class SqlAlchemyRefreshTokenRepository(IRefreshTokenRepository):
 
     async def remove(self, entity: RefreshToken) -> None:
         self._session.execute(
-            RefreshTokenOrm.__table__.delete().where(
-                RefreshTokenOrm.public_id == entity.id.value
-            )
+            RefreshTokenOrm.__table__.delete().where(RefreshTokenOrm.public_id == entity.id.value)
         )
 
     async def exists(self, id_: RefreshTokenId) -> bool:
         return (
             self._session.scalar(
-                select(RefreshTokenOrm.id).where(
-                    RefreshTokenOrm.public_id == id_.value
-                )
+                select(RefreshTokenOrm.id).where(RefreshTokenOrm.public_id == id_.value)
             )
             is not None
         )
@@ -103,9 +99,7 @@ class SqlAlchemyRefreshTokenRepository(IRefreshTokenRepository):
     async def revoke_chain_from(self, token_id: RefreshTokenId) -> None:
         """Revoke ``token_id`` and every descendant in its rotation chain."""
         start_int = self._session.scalar(
-            select(RefreshTokenOrm.id).where(
-                RefreshTokenOrm.public_id == token_id.value
-            )
+            select(RefreshTokenOrm.id).where(RefreshTokenOrm.public_id == token_id.value)
         )
         if start_int is None:
             return
@@ -115,9 +109,7 @@ class SqlAlchemyRefreshTokenRepository(IRefreshTokenRepository):
         while frontier:
             next_rows = (
                 self._session.execute(
-                    select(RefreshTokenOrm.id).where(
-                        RefreshTokenOrm.replaced_by.in_(frontier)
-                    )
+                    select(RefreshTokenOrm.id).where(RefreshTokenOrm.replaced_by.in_(frontier))
                 )
                 .scalars()
                 .all()
@@ -140,23 +132,14 @@ class SqlAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             return
         self._session.execute(
             update(RefreshTokenOrm)
-            .where(
-                (RefreshTokenOrm.user_id == user_int_id)
-                & (RefreshTokenOrm.status != "revoked")
-            )
+            .where((RefreshTokenOrm.user_id == user_int_id) & (RefreshTokenOrm.status != "revoked"))
             .values(status="revoked", revoked_at=datetime.now(UTC))
         )
 
     # --- internal -----------------------------------------------------------
 
-    def _resolve_user_int_id(
-        self, user_id: UserId, *, raise_if_missing: bool = True
-    ) -> int | None:
-        result = self._session.scalar(
-            select(UserOrm.id).where(UserOrm.public_id == user_id.value)
-        )
+    def _resolve_user_int_id(self, user_id: UserId, *, raise_if_missing: bool = True) -> int | None:
+        result = self._session.scalar(select(UserOrm.id).where(UserOrm.public_id == user_id.value))
         if result is None and raise_if_missing:
-            raise RuntimeError(
-                f"Cannot persist refresh token: user {user_id} not found"
-            )
+            raise RuntimeError(f"Cannot persist refresh token: user {user_id} not found")
         return result

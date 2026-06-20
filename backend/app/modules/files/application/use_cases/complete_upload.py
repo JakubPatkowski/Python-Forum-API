@@ -34,9 +34,7 @@ class CompleteUploadUseCase:
         self._processor = processor
         self._bus = bus
 
-    async def execute(
-        self, cmd: CompleteUploadCommand
-    ) -> Result[FileView, DomainError]:
+    async def execute(self, cmd: CompleteUploadCommand) -> Result[FileView, DomainError]:
         async with self._uow as uow:
             file = await uow.files.get(FileId(cmd.file_public_id))
             if file is None:

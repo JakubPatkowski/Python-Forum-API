@@ -42,9 +42,7 @@ async def _handle_domain_error(request: Request, exc: DomainError) -> JSONRespon
     )
 
 
-async def _handle_validation_error(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def _handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     # Take the first validation error to keep envelope simple.
     first = exc.errors()[0] if exc.errors() else None
     field = ".".join(str(p) for p in first["loc"][1:]) if first else None

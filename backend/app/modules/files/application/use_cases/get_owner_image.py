@@ -23,9 +23,7 @@ class GetAvatarUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, user_public_id: UUID
-    ) -> Result[FileView | None, DomainError]:
+    async def execute(self, user_public_id: UUID) -> Result[FileView | None, DomainError]:
         async with self._uow as uow:
             public_id = await uow.current_avatar_file_public_id(user_public_id)
             if public_id is None:
@@ -43,13 +41,9 @@ class GetCategoryImageUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, category_public_id: UUID
-    ) -> Result[FileView | None, DomainError]:
+    async def execute(self, category_public_id: UUID) -> Result[FileView | None, DomainError]:
         async with self._uow as uow:
-            public_id = await uow.current_category_image_file_public_id(
-                category_public_id
-            )
+            public_id = await uow.current_category_image_file_public_id(category_public_id)
             if public_id is None:
                 return Ok(None)
             file = await uow.files.get(FileId(public_id))
@@ -65,9 +59,7 @@ class GetPostIconUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, post_public_id: UUID
-    ) -> Result[FileView | None, DomainError]:
+    async def execute(self, post_public_id: UUID) -> Result[FileView | None, DomainError]:
         async with self._uow as uow:
             public_id = await uow.current_post_icon_file_public_id(post_public_id)
             if public_id is None:

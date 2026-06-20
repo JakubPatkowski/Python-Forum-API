@@ -41,9 +41,7 @@ class DirectUploadUseCase:
         self._processor = processor
         self._bus = bus
 
-    async def execute(
-        self, cmd: DirectUploadCommand
-    ) -> Result[FileView, DomainError]:
+    async def execute(self, cmd: DirectUploadCommand) -> Result[FileView, DomainError]:
         try:
             declared = validate_declared_type(cmd.content_type)
             enforce_size(len(cmd.data))

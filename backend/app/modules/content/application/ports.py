@@ -65,14 +65,10 @@ class ICommentRepository(IRepository[Comment, CommentId], Protocol):
 
     async def get_with_summary(self, id_: CommentId) -> CommentSummary | None: ...
 
-    async def parent_path_for(
-        self, parent_id: CommentId
-    ) -> tuple[str, int] | None:
+    async def parent_path_for(self, parent_id: CommentId) -> tuple[str, int] | None:
         """Return ``(path, depth)`` of an existing parent comment, if any."""
 
-    async def list_tree_for_post(
-        self, post_public_id: UUID
-    ) -> list[CommentSummary]:
+    async def list_tree_for_post(self, post_public_id: UUID) -> list[CommentSummary]:
         """Return the entire tree of a post sorted DFS by ``path``."""
 
     async def save(self, comment: Comment) -> None:

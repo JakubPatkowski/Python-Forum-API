@@ -1,0 +1,81 @@
+# Auto-generate API documentation and publish it to GitHub Pages.
+#
+# Pipeline: import the FastAPI app -> dump openapi.json (no DB needed) ->
+# render a static Redoc site -> deploy to Pages. The published docs always
+# track the latest schema on master.
+#
+# One-time setup: repository Settings > Pages > Build and deployment >
+# Source = "GitHub Actions".
+name: API Docs
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/api-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent Pages deployment; let an in-flight one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Generate OpenAPI + Redoc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Same import-time requirements as the test workflow.
+      DEBUG: "true"
+      SECRET_KEY: "ci-openapi-export-placeholder"
+      UPLOAD_DIR: /tmp/forum-uploads
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libmagic (python-magic runtime dependency)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libmagic1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install runtime dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Export OpenAPI schema
+        run: uv run python scripts/export_openapi.py "$GITHUB_WORKSPACE/site/openapi.json"
+
+      - name: Render Redoc static site
+        run: |
+          npx --yes @redocly/cli@latest build-docs \
+            "$GITHUB_WORKSPACE/site/openapi.json" \
+            --output "$GITHUB_WORKSPACE/site/index.html" \
+            --title "Forum Wędkarskie API"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

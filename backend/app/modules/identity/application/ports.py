@@ -41,9 +41,7 @@ class IRoleRepository(Protocol):
     async def list_all(self) -> list[Role]: ...
 
 
-class IRefreshTokenRepository(
-    IRepository[RefreshToken, RefreshTokenId], Protocol
-):
+class IRefreshTokenRepository(IRepository[RefreshToken, RefreshTokenId], Protocol):
     async def get_by_public_id(self, public_id: UUID) -> RefreshToken | None: ...
 
     async def save(self, token: RefreshToken) -> None:

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1180" height="880" viewBox="0 0 1180 880" xmlns="http://www.w3.org/2000/svg">
+<style><![CDATA[
+*{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;display:flex;justify-content:center;padding:30px;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  svg{background:#0d1117;border-radius:14px}
+  .title{fill:#e6edf3;font-size:28px;font-weight:700}
+  .actor{font-size:17px;font-weight:700;fill:#fff}
+  .msg{font-size:14.5px;font-weight:600;fill:#e6edf3}
+  .note{font-size:13px;font-style:italic;fill:#8b949e}
+  .lifeline{stroke:#8b949e;stroke-width:1.5;stroke-dasharray:5 6}
+]]></style>
+  <defs>
+    <marker id="ar" markerWidth="11" markerHeight="11" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 Z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <text x="590" y="50" text-anchor="middle" class="title">JWT authentication flow (access + refresh + rotation)</text>
+
+  <!-- lifelines -->
+  <line x1="200" y1="135" x2="200" y2="830" class="lifeline"/>
+  <line x1="590" y1="135" x2="590" y2="830" class="lifeline"/>
+  <line x1="980" y1="135" x2="980" y2="830" class="lifeline"/>
+
+  <!-- actor headers -->
+  <g>
+    <rect x="90" y="92" width="220" height="46" rx="8" fill="#58a6ff"/>
+    <text x="200" y="121" text-anchor="middle" class="actor">Browser (SPA)</text>
+  </g>
+  <g>
+    <rect x="480" y="92" width="220" height="46" rx="8" fill="#39c5bb"/>
+    <text x="590" y="121" text-anchor="middle" class="actor">Backend / identity</text>
+  </g>
+  <g>
+    <rect x="870" y="92" width="220" height="46" rx="8" fill="#3fb950"/>
+    <text x="980" y="121" text-anchor="middle" class="actor">PostgreSQL</text>
+  </g>
+
+  <!-- 1. POST /login -->
+  <text x="395" y="188" text-anchor="middle" class="msg">POST /login (email + password)</text>
+  <line x1="200" y1="198" x2="588" y2="198" stroke="#e6edf3" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 2. Argon2 verify -->
+  <text x="785" y="250" text-anchor="middle" class="msg">Argon2id.verify(hash, password)</text>
+  <line x1="590" y1="260" x2="978" y2="260" stroke="#39c5bb" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 3. INSERT refresh_tokens -->
+  <text x="785" y="312" text-anchor="middle" class="msg">INSERT refresh_tokens (sha256(jwt))</text>
+  <line x1="980" y1="322" x2="592" y2="322" stroke="#3fb950" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 4. tokens back -->
+  <text x="395" y="374" text-anchor="middle" class="msg">access (15 min) + refresh (14 days)</text>
+  <line x1="590" y1="384" x2="202" y2="384" stroke="#39c5bb" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="395" y="404" text-anchor="middle" class="note">refresh → httpOnly cookie  ·  access → JS memory only</text>
+
+  <!-- divider: token expires -->
+  <rect x="130" y="438" width="200" height="40" rx="8" fill="#d29922"/>
+  <text x="230" y="463" text-anchor="middle" class="actor" font-size="15">access expired (401)</text>
+
+  <!-- 5. POST /refresh -->
+  <text x="395" y="524" text-anchor="middle" class="msg">POST /refresh (cookie)</text>
+  <line x1="200" y1="534" x2="588" y2="534" stroke="#e6edf3" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- 6. lookup -->
+  <text x="785" y="576" text-anchor="middle" class="msg">lookup by jti · status == ACTIVE?</text>
+  <line x1="590" y1="586" x2="978" y2="586" stroke="#39c5bb" stroke-width="2" marker-end="url(#ar)"/>
+
+  <!-- reuse-detection note box: opaque base hides the lifeline behind it, then red tint -->
+  <rect x="380" y="618" width="420" height="74" rx="10" fill="#0d1117" stroke="none"/>
+  <rect x="380" y="618" width="420" height="74" rx="10" fill="rgba(248,81,73,.12)" stroke="#f85149" stroke-width="1.5"/>
+  <text x="590" y="648" text-anchor="middle" class="msg" fill="#f85149">if status == ROTATED → reuse detection!</text>
+  <text x="590" y="672" text-anchor="middle" class="note" fill="#f85149">revoke entire token chain + emit event</text>
+
+  <!-- 7. new pair -->
+  <text x="395" y="744" text-anchor="middle" class="msg">new pair · old token → ROTATED</text>
+    <line x1="590" y1="754" x2="202" y2="754" stroke="#39c5bb" stroke-width="2" marker-end="url(#ar)"/>
+
+  </svg>

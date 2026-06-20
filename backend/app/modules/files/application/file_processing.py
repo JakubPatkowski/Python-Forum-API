@@ -106,13 +106,9 @@ async def finalize_file(
         dims = processor.probe_image(data)
         if dims is not None:
             width, height = dims
-        for variant in processor.make_image_variants(
-            data, sizes=settings.IMAGE_THUMBNAIL_SIZES
-        ):
+        for variant in processor.make_image_variants(data, sizes=settings.IMAGE_THUMBNAIL_SIZES):
             key = _variant_key(file.storage_key, variant.name)
-            await storage.put_bytes(
-                str(key), variant.data, content_type=variant.content_type
-            )
+            await storage.put_bytes(str(key), variant.data, content_type=variant.content_type)
             variants[variant.name] = ImageVariant(
                 name=variant.name,
                 storage_key=key,

@@ -189,9 +189,7 @@ async def list_my_files(
     offset: int = Query(default=0, ge=0),
 ) -> list[FileResponse]:
     result = await uc.execute(
-        ListMyFilesQuery(
-            uploader_public_id=user.public_id, limit=limit, offset=offset
-        )
+        ListMyFilesQuery(uploader_public_id=user.public_id, limit=limit, offset=offset)
     )
     _raise_if_error(result)
     return [FileResponse.from_view(v) for v in result.value]  # type: ignore[union-attr]
@@ -338,9 +336,7 @@ async def list_comment_files(
     uc: Annotated[ListOwnerFilesUseCase, Depends(get_list_owner_files_uc)],
 ) -> list[FileResponse]:
     result = await uc.execute(
-        ListOwnerFilesQuery(
-            owner_type=FileOwnerType.COMMENT, owner_public_id=comment_id
-        )
+        ListOwnerFilesQuery(owner_type=FileOwnerType.COMMENT, owner_public_id=comment_id)
     )
     _raise_if_error(result)
     return [FileResponse.from_view(v) for v in result.value]  # type: ignore[union-attr]
@@ -389,9 +385,7 @@ async def get_user_avatar(
     if view is None:
         raise HTTPException(status_code=404, detail="No avatar set")
     target = (
-        view.variants[variant].url
-        if variant is not None and variant in view.variants
-        else view.url
+        view.variants[variant].url if variant is not None and variant in view.variants else view.url
     )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
@@ -413,7 +407,7 @@ async def set_category_image(
     uc: Annotated[SetCategoryImageUseCase, Depends(get_set_category_image_uc)],
     file: UploadFile = File(...),
 ) -> FileResponse:
-    # Ownership: właściciel kategorii LUB moderator (category.manage).
+    # Ownership: category owner OR moderator (category.manage).
     owner_row = db.execute(
         text(
             "SELECT u.public_id FROM categories c "
@@ -459,15 +453,13 @@ async def get_category_image(
     if view is None:
         raise HTTPException(status_code=404, detail="No category image set")
     target = (
-        view.variants[variant].url
-        if variant is not None and variant in view.variants
-        else view.url
+        view.variants[variant].url if variant is not None and variant in view.variants else view.url
     )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 # --------------------------------------------------------------------------- #
-# Post (thread) icons — ikona wątku (owner_type=post_icon)                    #
+# Post (thread) icons -- thread icon (owner_type=post_icon)                   #
 # --------------------------------------------------------------------------- #
 
 
@@ -483,7 +475,7 @@ async def set_post_icon(
     uc: Annotated[SetPostIconUseCase, Depends(get_set_post_icon_uc)],
     file: UploadFile = File(...),
 ) -> FileResponse:
-    # Autoryzacja: autor wątku LUB moderator (post.update.any).
+    # Authorization: thread author OR moderator (post.update.any).
     author_row = db.execute(
         text(
             "SELECT u.public_id FROM posts p "
@@ -493,9 +485,7 @@ async def set_post_icon(
         {"pid": str(post_id)},
     ).first()
     if author_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     is_author = author_row[0] is not None and str(author_row[0]) == str(user.public_id)
     if not is_author and not user.has("post.update.any"):
         raise HTTPException(
@@ -531,8 +521,6 @@ async def get_post_icon(
     if view is None:
         raise HTTPException(status_code=404, detail="No post icon set")
     target = (
-        view.variants[variant].url
-        if variant is not None and variant in view.variants
-        else view.url
+        view.variants[variant].url if variant is not None and variant in view.variants else view.url
     )
     return RedirectResponse(url=target, status_code=status.HTTP_307_TEMPORARY_REDIRECT)

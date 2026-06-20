@@ -1,8 +1,10 @@
 # NodePort so the BROWSER can reach MinIO for presigned upload/download.
 # - Inside the cluster the backend uses  minio-service:9000  (ClusterIP).
-# - From the host the browser uses        <minikube ip>:30900  → set this as
-#   MINIO_PUBLIC_ENDPOINT in k8s/backend/configmap.yaml.
-#   Find the IP with:  minikube ip
+# - From the host the browser reaches MinIO via a kubectl port-forward on
+#   localhost:30900 (started by scripts/portforward.ps1), which is the value
+#   set as MINIO_PUBLIC_ENDPOINT in k8s/backend/configmap.yaml. Do NOT use
+#   <minikube ip>:30900 — with the docker driver on Windows the node IP is
+#   unreachable from the host (see docs/19 and the note in configmap.yaml).
 apiVersion: v1
 kind: Service
 metadata:

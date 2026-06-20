@@ -16,10 +16,10 @@ spec:
   template:
     metadata:
       labels:
-        # `app: minio` is required... no — this Job is a *client* of MinIO.
-        # It only needs to reach minio-service:9000, which the minio
-        # NetworkPolicy allows from backend; to keep it simple it is labelled
-        # app: backend so the same allow rule applies.
+        # This Job is a *client* of MinIO: it only needs to reach
+        # minio-service:9000, which the minio NetworkPolicy allows from the
+        # `app: backend` source. It is labelled `app: backend` so that same
+        # allow rule applies without an extra policy.
         app: backend
         component: create-bucket
     spec:

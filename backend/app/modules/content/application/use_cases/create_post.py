@@ -35,9 +35,7 @@ class CreatePostUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: CreatePostCommand
-    ) -> Result[PostSummary, DomainError]:
+    async def execute(self, cmd: CreatePostCommand) -> Result[PostSummary, DomainError]:
         title = cmd.title.strip()
         fmt = ContentFormat(cmd.content_format)
         content = MarkdownContent(body=cmd.content, format=fmt)
@@ -50,9 +48,7 @@ class CreatePostUseCase:
                 # Loading by domain id reuses the repository contract.
                 from app.modules.content.domain.category import CategoryId
 
-                category = await uow.categories.get(
-                    CategoryId(cmd.category_public_id)
-                )
+                category = await uow.categories.get(CategoryId(cmd.category_public_id))
                 if category is None:
                     return Err(CategoryNotFound(str(cmd.category_public_id)))
 
@@ -65,9 +61,7 @@ class CreatePostUseCase:
             if cmd.tag_names:
                 cleaned_names = [n.strip().lower() for n in cmd.tag_names if n.strip()]
                 if cleaned_names:
-                    tags = set(
-                        await uow.tags.upsert_many_by_name(list(cleaned_names))
-                    )
+                    tags = set(await uow.tags.upsert_many_by_name(list(cleaned_names)))
 
             post = Post.create(
                 author_id=author_id,

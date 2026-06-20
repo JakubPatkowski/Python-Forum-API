@@ -60,9 +60,7 @@ class SlugAlreadyTaken(ConflictError):
     code = "SLUG_TAKEN"
 
     def __init__(self, slug: str) -> None:
-        super().__init__(
-            f"You already have a post with slug {slug!r}", field="slug"
-        )
+        super().__init__(f"You already have a post with slug {slug!r}", field="slug")
 
 
 class NotPostOwner(PermissionDeniedError):
@@ -76,9 +74,7 @@ class NotCommentOwner(PermissionDeniedError):
     code = "NOT_COMMENT_OWNER"
 
     def __init__(self) -> None:
-        super().__init__(
-            "Only the author or a moderator can modify this comment"
-        )
+        super().__init__("Only the author or a moderator can modify this comment")
 
 
 class InvalidCursor(ValidationError):

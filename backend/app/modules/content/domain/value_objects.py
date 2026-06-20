@@ -82,15 +82,11 @@ class Slug(ValueObject):
         """
         transliterated = text.translate(_TRANSLITERATION)
         normalised = unicodedata.normalize("NFKD", transliterated)
-        ascii_only = "".join(
-            ch for ch in normalised if not unicodedata.combining(ch)
-        )
+        ascii_only = "".join(ch for ch in normalised if not unicodedata.combining(ch))
         lowered = ascii_only.lower()
         slug_body = _SLUG_REPLACE_RE.sub("-", lowered).strip("-")
         if not slug_body:
-            raise ValidationError(
-                f"Could not derive a slug from text: {text!r}", field="slug"
-            )
+            raise ValidationError(f"Could not derive a slug from text: {text!r}", field="slug")
         return cls(slug_body[:max_length].rstrip("-"))
 
 

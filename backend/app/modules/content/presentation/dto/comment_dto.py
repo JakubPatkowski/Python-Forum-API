@@ -94,9 +94,7 @@ class CommentResponse(BaseModel):
             content=s.content,
             content_format=s.content_format,
             is_deleted=s.is_deleted,
-            author=CommentAuthorResponse(
-                public_id=s.author.public_id, username=s.author.username
-            ),
+            author=CommentAuthorResponse(public_id=s.author.public_id, username=s.author.username),
             created_at=s.created_at,
             updated_at=s.updated_at,
         )
@@ -108,7 +106,5 @@ class CommentTreeResponse(BaseModel):
     items: list[CommentResponse]
 
     @classmethod
-    def from_summaries(
-        cls, items: list[CommentSummary]
-    ) -> CommentTreeResponse:
+    def from_summaries(cls, items: list[CommentSummary]) -> CommentTreeResponse:
         return cls(items=[CommentResponse.from_summary(c) for c in items])

@@ -47,9 +47,7 @@ class FileTooLarge(DomainError):
     http_status = 413
 
     def __init__(self, *, size: int, limit: int) -> None:
-        super().__init__(
-            f"File is {size} bytes; the limit is {limit} bytes", field="size_bytes"
-        )
+        super().__init__(f"File is {size} bytes; the limit is {limit} bytes", field="size_bytes")
 
 
 class UploadNotConfirmed(DomainError):

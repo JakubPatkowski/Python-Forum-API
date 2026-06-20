@@ -1,4 +1,3 @@
-import { useTranslation } from '../../i18n/LangContext';
 import { Icon } from '../Icon';
 
 /**
@@ -12,7 +11,6 @@ import { Icon } from '../Icon';
  * publiczny), więc działają w <img>/<video> bez nagłówka auth.
  */
 export function Attachments({ files }) {
-  const t = useTranslation();
   if (!files || files.length === 0) return null;
 
   const images = files.filter((f) => f.kind === 'image');

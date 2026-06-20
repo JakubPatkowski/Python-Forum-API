@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="660" viewBox="0 0 1200 660" xmlns="http://www.w3.org/2000/svg">
+<style><![CDATA[
+*{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;display:flex;justify-content:center;padding:30px;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  svg{background:#0d1117;border-radius:14px}
+  .title{fill:#e6edf3;font-size:26px;font-weight:700}
+  .sub{fill:#8b949e;font-size:14px;font-style:italic}
+  .axis{stroke:#30363d;stroke-width:1.5}
+  .grid{stroke:#30363d;stroke-width:1;stroke-dasharray:3 5;opacity:.55}
+  .tick{fill:#8b949e;font-size:12px}
+  .axlabel{fill:#e6edf3;font-size:13px;font-weight:600}
+  .legend{font-size:13.5px;font-weight:600;}
+  .ann{font-size:12px;fill:#8b949e}
+  .badge{font-size:13px;font-weight:700}
+]]></style>
+  <text x="600" y="44" text-anchor="middle" class="title">Load test profile (demo) — planned HPA scaling &amp; latency</text>
+  <text x="600" y="68" text-anchor="middle" class="sub">Illustrative target shape — k6 staged ramp 10 → 40 → 80 VU over ~7 min</text>
+
+  <!-- ====== plot frame: x 130..1090 , y 120..540 ====== -->
+  <!-- horizontal gridlines at VU 0,15,30,45,60,75,90 (y 540..120) -->
+  <!-- y = 540 - vu/90*420 -->
+  <g class="grid">
+    <line x1="130" y1="540" x2="1090" y2="540"/>
+    <line x1="130" y1="470" x2="1090" y2="470"/>
+    <line x1="130" y1="400" x2="1090" y2="400"/>
+    <line x1="130" y1="330" x2="1090" y2="330"/>
+    <line x1="130" y1="260" x2="1090" y2="260"/>
+    <line x1="130" y1="190" x2="1090" y2="190"/>
+    <line x1="130" y1="120" x2="1090" y2="120"/>
+  </g>
+
+  <!-- axes -->
+  <line x1="130" y1="120" x2="130" y2="540" class="axis"/>
+  <line x1="1090" y1="120" x2="1090" y2="540" class="axis"/>
+  <line x1="130" y1="540" x2="1090" y2="540" class="axis"/>
+
+  <!-- LEFT Y ticks: VU 0..90 -->
+  <g class="tick" text-anchor="end">
+    <text x="120" y="545">0</text>
+    <text x="120" y="475">15</text>
+    <text x="120" y="405">30</text>
+    <text x="120" y="335">45</text>
+    <text x="120" y="265">60</text>
+    <text x="120" y="195">75</text>
+    <text x="120" y="125">90</text>
+  </g>
+  <text x="44" y="330" class="axlabel" transform="rotate(-90 44 330)" text-anchor="middle">Virtual users (VU)</text>
+
+  <!-- secondary left scale: backend replicas 0..3 — highlighted in green with tick marks
+       so it reads as a distinct axis tied to the dashed replica line -->
+  <g stroke="#3fb950" stroke-width="2">
+    <line x1="92" y1="540" x2="100" y2="540"/>
+    <line x1="92" y1="435" x2="100" y2="435"/>
+    <line x1="92" y1="330" x2="100" y2="330"/>
+    <line x1="92" y1="225" x2="100" y2="225"/>
+  </g>
+  <g text-anchor="end" fill="#3fb950" font-weight="700" font-size="13">
+    <text x="88" y="545">0</text>
+    <text x="88" y="440">1</text>
+    <text x="88" y="335">2</text>
+    <text x="88" y="230">3</text>
+  </g>
+  <text x="70" y="170" fill="#3fb950" font-weight="700" font-size="12" text-anchor="middle">replicas</text>
+
+  <!-- RIGHT Y ticks: p95 latency 0..120 ms ; y = 540 - ms/120*420 -->
+  <g class="tick" text-anchor="start">
+    <text x="1098" y="545">0</text>
+    <text x="1098" y="470">20</text>
+    <text x="1098" y="400">40</text>
+    <text x="1098" y="330">60</text>
+    <text x="1098" y="260">80</text>
+    <text x="1098" y="190">100</text>
+    <text x="1098" y="125">120</text>
+  </g>
+  <text x="1170" y="330" class="axlabel" transform="rotate(90 1170 330)" text-anchor="middle">p95 latency (ms)</text>
+
+  <!-- X ticks: time 0..7 min over x 130..1090 (960px) -->
+  <g class="tick" text-anchor="middle">
+    <text x="130" y="562">0</text>
+    <text x="267" y="562">1</text>
+    <text x="404" y="562">2</text>
+    <text x="541" y="562">3</text>
+    <text x="678" y="562">4</text>
+    <text x="815" y="562">5</text>
+    <text x="952" y="562">6</text>
+    <text x="1090" y="562">7</text>
+  </g>
+  <text x="610" y="592" class="axlabel" text-anchor="middle">Test time (minutes)</text>
+
+  <!-- ====== VU staircase (blue) ======
+       stages: 0-1m ramp to 10, 1-2.5m hold 10, 2.5m jump 40, hold to 4.5m,
+       4.5m jump 80, hold to 6m, 6-7m ramp down to 0.
+       y(vu)=540 - vu/90*420  ->  10:493  40:353  80:167 -->
+  <polyline fill="none" stroke="#58a6ff" stroke-width="3" points="130,540 267,493 472,493 472,353 678,353 678,167 952,167 1090,540"/>
+
+  <!-- HPA replicas (green dashed) using replica scale (0:540 1:435 2:330 3:225)
+       replicas follow load with lag: 1 until ~2.8m, ramp to 2 by 3.2m, to 3 by 5m, hold, scale-in after 6.2m -->
+  <polyline fill="none" stroke="#3fb950" stroke-width="3" stroke-dasharray="9 6" points="130,435 500,435 560,330 760,330 820,225 990,225 1090,330"/>
+
+  <!-- p95 latency (amber) right scale y=540-ms/120*420
+       low ~15ms, spikes to ~95ms right after each VU jump (before HPA catches up), settles ~45ms -->
+  <polyline fill="none" stroke="#d29922" stroke-width="3" points="130,488 267,475 472,475 500,330 600,418 678,418 720,200 820,365 952,383 1090,418"/>
+
+  <!-- markers for VU jump events -->
+  <g>
+    <line x1="472" y1="120" x2="472" y2="540" stroke="#58a6ff" stroke-width="1" stroke-dasharray="2 5" opacity=".4"/>
+    <line x1="678" y1="120" x2="678" y2="540" stroke="#58a6ff" stroke-width="1" stroke-dasharray="2 5" opacity=".4"/>
+    <text x="478" y="140" class="ann">+40 VU</text>
+    <text x="684" y="140" class="ann">+80 VU</text>
+  </g>
+
+  <!-- annotation: latency spike then recovers as HPA adds pods -->
+  <text x="720" y="186" class="ann" fill="#d29922" text-anchor="middle">p95 spike</text>
+  <text x="880" y="350" class="ann" fill="#3fb950" text-anchor="middle">HPA adds pods → latency recovers</text>
+
+  <!-- legend: lines and labels share one baseline (y=624, text vertically centered) -->
+  </svg>

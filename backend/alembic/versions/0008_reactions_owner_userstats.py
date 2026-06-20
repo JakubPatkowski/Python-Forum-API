@@ -4,18 +4,18 @@ Revision ID: 0008
 Revises: 0007
 Create Date: 2026-06-01 00:00:00.000000
 
-Trzy zmiany pod „engagement" i statystyki:
+Three changes for "engagement" and statistics:
 
-* ``categories.owner_id`` (FK users, nullable) — twórca kategorii; pozwala
-  zwykłemu userowi zarządzać ikoną SWOJEJ kategorii.
-* ``reactions`` — polubienia postów i komentarzy. Polimorficzny target przez
-  ``target_type`` + ``target_id`` (int FK do posts/comments — bez twardego FK,
-  bo target_type rozróżnia tabelę). Unikat ``(user_id, target_type, target_id)``.
-* widok ``user_stats`` — agregat statystyk usera (posty, komentarze, polubienia
-  otrzymane, data dołączenia). Zgodne z „Fazą 6 — widoki DB"; brak nowej tabeli
-  do utrzymania, liczone na bieżąco.
+* ``categories.owner_id`` (FK users, nullable) -- category creator; lets a
+  regular user manage the icon of THEIR OWN category.
+* ``reactions`` -- likes on posts and comments. Polymorphic target via
+  ``target_type`` + ``target_id`` (int FK to posts/comments -- no hard FK,
+  because target_type distinguishes the table). Unique ``(user_id, target_type, target_id)``.
+* ``user_stats`` view -- aggregate of user statistics (posts, comments, likes
+  received, join date). Aligned with "Phase 6 -- DB views"; no new table to
+  maintain, computed on the fly.
 
-Dialect-aware (Postgres + gałąź SQLite dla testów), wzorzec z 0002/0004/0006.
+Dialect-aware (Postgres + a SQLite branch for tests), pattern from 0002/0004/0006.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def upgrade() -> None:
             "categories",
             sa.Column("owner_id", sa.Integer(), nullable=True),
         )
-        # FK osobno, żeby SQLite (batch-less) nie wybuchał
+        # FK added separately so SQLite (batch-less) doesn't blow up
         if is_postgres:
             op.create_foreign_key(
                 "fk_categories_owner_id_users",
@@ -94,7 +94,7 @@ def upgrade() -> None:
         )
 
     # --- user_stats view ----------------------------------------------------
-    # Polubienia otrzymane = reactions wskazujące na posty/komentarze autora.
+    # Likes received = reactions pointing at the author's posts/comments.
     op.execute("DROP VIEW IF EXISTS user_stats")
     op.execute(
         """

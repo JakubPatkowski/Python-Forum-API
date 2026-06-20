@@ -1,0 +1,132 @@
+# End-to-end tests on an ephemeral Kubernetes cluster (kind).
+#
+# This is the project's "staging" environment: every run spins up a throwaway
+# Kubernetes cluster, deploys the REAL manifests from k8s/ (the same ones used
+# on minikube), and runs a smoke test through the live stack
+# (ingress-less, via a port-forward). The cluster is destroyed afterwards.
+#
+# The real Secret manifests are gitignored, so this workflow synthesises
+# development-grade secrets at deploy time (matching the committed examples).
+name: E2E (kind)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'k8s/**'
+      - 'scripts/e2e-smoke.sh'
+      - '.github/workflows/e2e-kind.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'k8s/**'
+      - 'scripts/e2e-smoke.sh'
+      - '.github/workflows/e2e-kind.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NS: forum-wedkarskie
+  CLUSTER: forum-e2e
+
+jobs:
+  e2e:
+    name: Deploy on kind & smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: forum-e2e
+          node_image: kindest/node:v1.31.2
+
+      - name: Build images
+        run: |
+          docker build -t forum-wedkarskie-backend:latest backend/
+          docker build -t forum-wedkarskie-frontend:latest frontend/
+
+      - name: Load images into kind
+        run: |
+          kind load docker-image forum-wedkarskie-backend:latest --name "$CLUSTER"
+          kind load docker-image forum-wedkarskie-frontend:latest --name "$CLUSTER"
+
+      - name: Create namespace & secrets
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          # Dev-grade secrets (the real secret.yaml files are gitignored).
+          # POSTGRES_PASSWORD must match the DATABASE_URL in backend-config.
+          kubectl create secret generic postgres-secret -n "$NS" \
+            --from-literal=POSTGRES_USER=postgres \
+            --from-literal=POSTGRES_PASSWORD=postgres \
+            --from-literal=POSTGRES_DB=forum_wedkarskie
+          kubectl create secret generic backend-secrets -n "$NS" \
+            --from-literal=SECRET_KEY="$(openssl rand -hex 64)"
+          kubectl create secret generic minio-secret -n "$NS" \
+            --from-literal=MINIO_ROOT_USER=minioadmin \
+            --from-literal=MINIO_ROOT_PASSWORD=minioadmin \
+            --from-literal=MINIO_ACCESS_KEY=minioadmin \
+            --from-literal=MINIO_SECRET_KEY=minioadmin
+
+      - name: Deploy PostgreSQL
+        run: |
+          kubectl apply -f k8s/postgres/pvc.yaml \
+                        -f k8s/postgres/deployment.yaml \
+                        -f k8s/postgres/service.yaml
+          kubectl wait --for=condition=ready pod -l app=postgres -n "$NS" --timeout=180s
+
+      - name: Deploy MinIO
+        run: |
+          kubectl apply -f k8s/minio/pvc.yaml \
+                        -f k8s/minio/deployment.yaml \
+                        -f k8s/minio/service.yaml
+          kubectl wait --for=condition=ready pod -l app=minio -n "$NS" --timeout=180s
+          kubectl apply -f k8s/minio/create-bucket-job.yaml
+
+      - name: Run database migrations (Job)
+        run: |
+          kubectl apply -f k8s/backend/configmap.yaml \
+                        -f k8s/backend/uploads-pvc.yaml \
+                        -f k8s/backend/migration-job.yaml
+          kubectl wait --for=condition=complete job/backend-migrate -n "$NS" --timeout=180s
+
+      - name: Deploy backend & frontend
+        run: |
+          kubectl apply -f k8s/backend/deployment.yaml \
+                        -f k8s/backend/service.yaml \
+                        -f k8s/frontend/configmap.yaml \
+                        -f k8s/frontend/deployment.yaml \
+                        -f k8s/frontend/service.yaml
+          kubectl rollout status deployment/backend  -n "$NS" --timeout=240s
+          kubectl rollout status deployment/frontend -n "$NS" --timeout=240s
+
+      - name: Smoke test (via port-forward)
+        run: |
+          kubectl port-forward -n "$NS" svc/backend-service 8000:8000 >/tmp/pf.log 2>&1 &
+          PF_PID=$!
+          # Wait for the tunnel to accept connections.
+          for i in $(seq 1 20); do
+            curl -fsS http://localhost:8000/health/live >/dev/null 2>&1 && break
+            sleep 2
+          done
+          bash scripts/e2e-smoke.sh http://localhost:8000
+          kill "$PF_PID" 2>/dev/null || true
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "::group::pods"; kubectl get pods -n "$NS" -o wide || true; echo "::endgroup::"
+          echo "::group::events"; kubectl get events -n "$NS" --sort-by=.lastTimestamp || true; echo "::endgroup::"
+          echo "::group::backend logs"; kubectl logs -n "$NS" -l app.kubernetes.io/name=backend --tail=200 || kubectl logs -n "$NS" -l app=backend --tail=200 || true; echo "::endgroup::"
+          echo "::group::migrate logs"; kubectl logs -n "$NS" job/backend-migrate --tail=200 || true; echo "::endgroup::"

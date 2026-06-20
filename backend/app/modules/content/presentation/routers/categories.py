@@ -49,7 +49,7 @@ async def list_categories(
 ) -> list[CategoryResponse]:
     result = await uc.execute()
     _raise_if_error(result)
-    # Dociągnij właścicieli jednym zapytaniem (public_id kategorii → public_id ownera).
+    # Fetch owners in a single query (category public_id -> owner public_id).
     owners = {
         str(row[0]): row[1]
         for row in db.execute(
@@ -80,8 +80,8 @@ async def create_category(
     result = await uc.execute(body.to_command())
     _raise_if_error(result)
     summary = result.value  # type: ignore[union-attr]
-    # Zapisz właściciela kategorii (twórcę). Robione osobnym UPDATE-em, żeby nie
-    # mieszać ownershipu do agregatu domenowego Category.
+    # Persist the category owner (creator). Done as a separate UPDATE so we
+    # don't mix ownership into the Category domain aggregate.
     db.execute(
         text(
             "UPDATE categories SET owner_id = "
@@ -104,8 +104,6 @@ async def delete_category(
     _user: CurrentUserData = Depends(requires("category.manage")),
     uc: DeleteCategoryUseCase = Depends(get_delete_category_uc),
 ) -> Response:
-    result = await uc.execute(
-        DeleteCategoryCommand(category_public_id=category_id)
-    )
+    result = await uc.execute(DeleteCategoryCommand(category_public_id=category_id))
     _raise_if_error(result)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -99,27 +99,21 @@ class SqlAlchemyFilesUnitOfWork(IFilesUnitOfWork):
 
     # --- avatar / category image -------------------------------------------
 
-    async def set_user_avatar(
-        self, user_public_id: UUID, file_internal_id: int | None
-    ) -> None:
+    async def set_user_avatar(self, user_public_id: UUID, file_internal_id: int | None) -> None:
         self._session_required().execute(
             update(UserOrm)
             .where(UserOrm.public_id == user_public_id)
             .values(avatar_file_id=file_internal_id)
         )
 
-    async def current_avatar_file_public_id(
-        self, user_public_id: UUID
-    ) -> UUID | None:
+    async def current_avatar_file_public_id(self, user_public_id: UUID) -> UUID | None:
         return self._session_required().scalar(
             select(FileOrm.public_id)
             .join(UserOrm, UserOrm.avatar_file_id == FileOrm.id)
             .where(UserOrm.public_id == user_public_id)
         )
 
-    async def current_category_image_file_public_id(
-        self, category_public_id: UUID
-    ) -> UUID | None:
+    async def current_category_image_file_public_id(self, category_public_id: UUID) -> UUID | None:
         category_id = self._sync_resolve_category(category_public_id)
         if category_id is None:
             return None
@@ -133,9 +127,7 @@ class SqlAlchemyFilesUnitOfWork(IFilesUnitOfWork):
             .limit(1)
         )
 
-    async def current_post_icon_file_public_id(
-        self, post_public_id: UUID
-    ) -> UUID | None:
+    async def current_post_icon_file_public_id(self, post_public_id: UUID) -> UUID | None:
         post_id = self._sync_resolve_post(post_public_id)
         if post_id is None:
             return None

@@ -86,31 +86,23 @@ async def test_full_auth_flow_with_reuse_detection(client: AsyncClient) -> None:
     refresh1 = tokens["refresh_token"]
 
     # --- /users/me ---------------------------------------------------------
-    resp = await client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {access}"}
-    )
+    resp = await client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {access}"})
     assert resp.status_code == 200, resp.text
     me = resp.json()
     assert me["username"] == "jakub"
     assert "post.create" in me["permissions"]
 
     # --- refresh -----------------------------------------------------------
-    resp = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh1}
-    )
+    resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert resp.status_code == 200, resp.text
     refresh2 = resp.json()["refresh_token"]
     assert refresh2 != refresh1
 
     # --- reuse of the old refresh => 401 + all sessions revoked -----------
-    resp = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh1}
-    )
+    resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert resp.status_code == 401, resp.text
     assert resp.json()["error"]["code"] == "REFRESH_TOKEN_REUSE"
 
     # The rotated successor token must also be unusable now.
-    resp = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh2}
-    )
+    resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh2})
     assert resp.status_code == 401, resp.text

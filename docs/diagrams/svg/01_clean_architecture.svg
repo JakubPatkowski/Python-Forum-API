@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1180" height="540" viewBox="0 0 1180 540" xmlns="http://www.w3.org/2000/svg">
+<style><![CDATA[
+  svg{background:#0d1117;border-radius:14px}
+  .ff{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+  .title{fill:#e6edf3;font-size:30px;font-weight:700}
+  .sub{fill:#8b949e;font-size:15px;font-style:italic}
+  .rlabel{font-weight:700;font-size:14px}
+  .ctitle{font-size:17px;font-weight:700}
+  .cbody{font-size:13.5px;fill:#c9d1d9}
+  .arrowcap{fill:#f85149;font-size:12px;font-weight:700}
+  .mono{font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:12.5px;fill:#e6edf3}
+]]></style>
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#f85149"/>
+    </marker>
+  </defs>
+
+  <text x="590" y="50" text-anchor="middle" class="ff title">Clean Architecture &#8212; the Dependency Rule</text>
+  <text x="590" y="78" text-anchor="middle" class="ff sub">domain &#8592; application &#8592; infrastructure / presentation</text>
+
+  <!-- ===== concentric rings: centre (270, 308), radii 200 / 130 / 62 ===== -->
+  <circle cx="270" cy="308" r="200" fill="rgba(210,153,34,.06)" stroke="#d29922" stroke-width="2"/>
+  <circle cx="270" cy="308" r="130" fill="rgba(88,166,255,.08)" stroke="#58a6ff" stroke-width="2"/>
+  <circle cx="270" cy="308" r="62"  fill="rgba(63,185,80,.14)" stroke="#3fb950" stroke-width="2"/>
+
+  <!-- ring labels -->
+  <text x="270" y="158" text-anchor="middle" class="ff rlabel" fill="#d29922">Infrastructure / Presentation</text>
+  <text x="270" y="220" text-anchor="middle" class="ff rlabel" fill="#58a6ff">Application</text>
+  <text x="270" y="237" text-anchor="middle" class="ff rlabel" fill="#58a6ff">(use cases, ports)</text>
+  <text x="270" y="291" text-anchor="middle" class="ff rlabel" fill="#3fb950" font-size="15">Domain</text>
+  <text x="270" y="310" text-anchor="middle" class="ff" fill="#3fb950" font-size="13">Entity &#183; VO</text>
+  <text x="270" y="327" text-anchor="middle" class="ff" fill="#3fb950" font-size="13">AggregateRoot</text>
+
+  <!-- dependency arrow -->
+  <line x1="510" y1="308" x2="338" y2="308" stroke="#f85149" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="420" y="336" text-anchor="middle" class="ff arrowcap">dependencies point inward</text>
+
+  <!-- ===== right side: 3 cards, evenly spaced ===== -->
+  <!-- gap = (540 - 100 - 110 - 3×120) / 4 = 22.5 → top y: 100, 242, 384 -->
+
+  <!-- Infrastructure / Presentation (gold) -->
+  <rect x="620" y="100" width="520" height="120" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <rect x="620" y="100" width="4"   height="120" fill="#d29922"/>
+  <text x="646" y="130" class="ff ctitle" fill="#d29922">Infrastructure / Presentation</text>
+  <text x="646" y="156" class="ff cbody">FastAPI routers (thin), Pydantic DTOs, deps (RBAC),</text>
+  <text x="646" y="175" class="ff cbody">middleware, error handler, SecurityHeaders.</text>
+  <text x="646" y="194" class="ff cbody">SQLAlchemy ORM, repositories, mappers, MinIO, PyJWT.</text>
+
+  <!-- Application (blue) -->
+  <rect x="620" y="240" width="520" height="110" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <rect x="620" y="240" width="4"   height="110" fill="#58a6ff"/>
+  <text x="646" y="270" class="ff ctitle" fill="#58a6ff">Application</text>
+  <text x="646" y="296" class="ff cbody">Use cases returning <tspan class="mono">Result[T,E]</tspan>, ports (Protocol),</text>
+  <text x="646" y="315" class="ff cbody">commands, UoW (IUnitOfWork), IEventBus.</text>
+  <text x="646" y="334" class="ff cbody">Zero imports from infrastructure.</text>
+
+  <!-- Domain (green) -->
+  <rect x="620" y="380" width="520" height="110" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <rect x="620" y="380" width="4"   height="110" fill="#3fb950"/>
+  <text x="646" y="410" class="ff ctitle" fill="#3fb950">Domain</text>
+  <text x="646" y="436" class="ff cbody">Entities, Value Objects, AggregateRoot, domain events.</text>
+  <text x="646" y="455" class="ff cbody">DomainErrors, EntityId, Result type.</text>
+  <text x="646" y="474" class="ff cbody">ZERO framework imports.</text>
+</svg>

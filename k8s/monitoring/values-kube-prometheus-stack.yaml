@@ -52,15 +52,15 @@ prometheus:
     externalLabels:
       cluster: forum-wedkarskie
     # Short retention — this is a demo cluster, not long-term storage.
-    # 3h jest wystarczające do obejrzenia wyników testu k6 zaraz po jego końcu,
-    # a zmniejsza ilość serii trzymanych w RAM (mniejszy footprint na 16 GB).
+    # 3h is enough to review the k6 test results right after it finishes, and
+    # it reduces the number of series kept in RAM (smaller footprint on 16 GB).
     retention: 3h
-    # Twardy limit rozmiaru bloków na dysku — chroni przed puchnięciem TSDB
-    # podczas testów obciążeniowych (dużo serii = dużo próbek).
+    # Hard cap on on-disk block size — protects against TSDB bloat during load
+    # tests (many series = many samples).
     retentionSize: "1GB"
-    # Keep the footprint small on minikube. Limit RAM Prometheusa jest
-    # najważniejszy podczas testów k6 — przy dużej liczbie serii head-block
-    # potrafi puchnąć; 768Mi to bezpieczny kompromis dla tej skali.
+    # Keep the footprint small on minikube. Prometheus's RAM limit matters most
+    # during k6 tests — with many series the head block can balloon; 768Mi is a
+    # safe compromise for this scale.
     resources:
       requests:
         cpu: "100m"
@@ -77,30 +77,75 @@ grafana:
   adminUser: admin
   adminPassword: admin
   defaultDashboardsEnabled: true        # ship the stock k8s/node dashboards
-  # PRZYCZYNA AWARII: Grafana 13.x z limitem 256Mi była zabijana przez OOMKiller
-  # (Exit Code 137). Sam start + indeksowanie bleve + wczytanie dashboardów
-  # przekracza 256Mi. Pod restartował się co kilka minut, dlatego port-forward
-  # dostawał "connection refused" (pod akurat nie żył). Podnosimy limit do 512Mi.
+  # FAILURE CAUSE (RAM): Grafana 13.x with a 256Mi limit was killed by the
+  # OOMKiller (exit code 137) — raised to 512Mi (RAM is no longer the problem,
+  # the node sits at ~30%).
+  #
+  # FAILURE CAUSE (CPU) — diagnosed 2026-06-13 during k6 tests: under load (the
+  # HPA scales the backend, the node jumps 210m -> 800m CPU) Grafana itself
+  # wants ~301m CPU and HITS the 300m LIMIT. CFS throttles it, so it cannot
+  # answer /api/health in time -> liveness 503 -> the kubelet restarts the pod.
+  # This was NOT an OOM (zero exit 137, zero MemoryPressure), just CPU
+  # starvation. We raise the CPU limit 300m -> 800m so Grafana survives the
+  # peak during tests.
   resources:
     requests:
-      cpu: "50m"
+      cpu: "100m"
       memory: "256Mi"
     limits:
-      cpu: "300m"
+      cpu: "800m"
       memory: "512Mi"
-  # Wylaczamy zbedne dla demo funkcje, ktore obciazaja pamiec/siec przy starcie:
-  # sprawdzanie aktualizacji i raportowanie telemetrii. Mniejszy footprint RAM.
+  # Disable features that are unnecessary for a demo and load memory/network at
+  # startup: update checks and telemetry reporting. Smaller RAM footprint.
   env:
     GF_ANALYTICS_REPORTING_ENABLED: "false"
     GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
-  # Liveness z dluzszym startem: jesli pierwszy start Grafany trwa (indeksowanie),
-  # nie zabijaj poda od razu - inaczej wpada w petle restartow.
+  # FAILURE CAUSE (2026-06-13): a dashboard with refresh=10s queried Prometheus
+  # and Loki; when Loki was overloaded, /api/ds/query calls hung for 50-100s and
+  # piled up, while Grafana concurrently tried to write to its SQLite database
+  # (sessions, cleanup, annotations) -> "database is locked (SQLITE_BUSY)" ->
+  # liveness /api/health timeout -> restart loop. The settings below remove that
+  # load: a shorter query timeout (don't wait a minute on a dead datasource),
+  # fewer expensive background jobs, fewer concurrent DB queries.
+  grafana.ini:
+    database:
+      # SQLite with WAL handles concurrent read+write without SQLITE_BUSY.
+      wal: true
+    dataproxy:
+      # Don't hang for minutes on an unhealthy datasource - cut it off after 20s.
+      timeout: 20
+      dialTimeout: 10
+    # Less noise and fewer background jobs that hit the locked database.
+    log:
+      level: warn
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+      check_for_plugin_updates: false
+    # Disable automatic plugin fetching at startup (the logs showed
+    # timeouts/permission denied on elasticsearch, lokiexplore, etc.).
+    plugins:
+      preinstall_disabled: true
+  # Liveness with a longer startup: if Grafana's first start takes a while
+  # (indexing), don't kill the pod immediately - otherwise it falls into a
+  # restart loop. Additionally (2026-06-13): looser thresholds so a brief CPU
+  # throttle during k6 tests doesn't end in a restart. failureThreshold=15 *
+  # periodSeconds=15 = ~3.75 min of tolerance before the kubelet declares the
+  # pod dead.
   livenessProbe:
     initialDelaySeconds: 90
     timeoutSeconds: 30
+    failureThreshold: 15
+    periodSeconds: 15
+  # Readiness is also loosened: the default (1s timeout, 30s failure) falls into
+  # "503 / context deadline exceeded" when Grafana is throttled, dropping it from
+  # the endpoint and breaking the port-forward. We give it time to recover.
+  readinessProbe:
+    initialDelaySeconds: 30
+    timeoutSeconds: 15
     failureThreshold: 10
-    periodSeconds: 10
+    periodSeconds: 15
   sidecar:
     dashboards:
       enabled: true
@@ -118,14 +163,20 @@ grafana:
       access: proxy
       url: http://loki.monitoring.svc.cluster.local:3100
       isDefault: false
+      # Per-query timeout to Loki: when Loki gets clogged, the logs panel returns
+      # an error after 20s instead of hanging for a minute and blocking all of
+      # Grafana.
+      jsonData:
+        timeout: 20
+        maxLines: 500
   # Reachable at http://grafana.local once the ingress (k8s/ingress) is applied.
-  # The ingress is optional — port-forward works too (scripts/portforward.ps1).
+  # The ingress is optional - port-forward works too (scripts/portforward.ps1).
 
 # --- Alertmanager ------------------------------------------------------------
-# WYŁĄCZONY: nie wysyłamy alertów (brak konfiguracji odbiorców), a Alertmanager
-# zajmował ~128Mi RAM i generował szum. Reguły alertowe (prometheus-rules.yaml)
-# nadal działają i są widoczne w Prometheus -> Alerts — tylko nie ma komponentu,
-# który by je gdzieś wysyłał. Odzyskaną pamięć przeznaczamy na Grafanę.
+# DISABLED: we don't send alerts (no receivers configured), and Alertmanager
+# took ~128Mi RAM and generated noise. The alerting rules (prometheus-rules.yaml)
+# still work and are visible in Prometheus -> Alerts - there is just no component
+# to dispatch them anywhere. The reclaimed memory goes to Grafana.
 alertmanager:
   enabled: false
 

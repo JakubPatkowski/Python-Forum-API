@@ -16,12 +16,8 @@ class ListOwnerFilesUseCase:
         self._uow = uow
         self._storage = storage
 
-    async def execute(
-        self, query: ListOwnerFilesQuery
-    ) -> Result[list[FileView], DomainError]:
+    async def execute(self, query: ListOwnerFilesQuery) -> Result[list[FileView], DomainError]:
         async with self._uow as uow:
-            files = await uow.files.list_for_owner(
-                query.owner_type, query.owner_public_id
-            )
+            files = await uow.files.list_for_owner(query.owner_type, query.owner_public_id)
             views = [await build_file_view(f, storage=self._storage) for f in files]
         return Ok(views)

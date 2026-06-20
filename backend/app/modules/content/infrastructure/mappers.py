@@ -168,18 +168,14 @@ def comment_from_orm(row, *, author_public_id: UUID | None) -> Comment:
     assert public_id is not None, "Comment row missing public_id"
 
     parent_public_id_attr = getattr(row, "_parent_public_id", None)
-    parent_id = (
-        CommentId(parent_public_id_attr) if parent_public_id_attr else None
-    )
+    parent_id = CommentId(parent_public_id_attr) if parent_public_id_attr else None
 
     return Comment(
         id=CommentId(public_id),
         post_id=PostId(row._post_public_id),
         author_id=UserId(author_public_id) if author_public_id else None,
         parent_id=parent_id,
-        content=MarkdownContent(
-            body=row.content, format=ContentFormat(fmt_value)
-        ),
+        content=MarkdownContent(body=row.content, format=ContentFormat(fmt_value)),
         depth=row.depth or 0,
         path=row.path or "",
         is_deleted=bool(row.is_deleted),

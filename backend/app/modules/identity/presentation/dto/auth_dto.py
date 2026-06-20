@@ -42,9 +42,7 @@ class LoginRequest(BaseModel):
     )
     password: str = Field(min_length=1, max_length=128)
 
-    def to_command(
-        self, *, user_agent: str | None, ip_address: str | None
-    ) -> LoginCommand:
+    def to_command(self, *, user_agent: str | None, ip_address: str | None) -> LoginCommand:
         return LoginCommand(
             username_or_email=self.username_or_email,
             password=self.password,

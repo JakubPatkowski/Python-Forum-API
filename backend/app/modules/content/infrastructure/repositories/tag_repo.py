@@ -21,21 +21,15 @@ class SqlAlchemyTagRepository(ITagRepository):
         self._session = session
 
     async def get(self, id_: TagId) -> Tag | None:
-        row = self._session.scalar(
-            select(TagOrm).where(TagOrm.public_id == id_.value)
-        )
+        row = self._session.scalar(select(TagOrm).where(TagOrm.public_id == id_.value))
         return tag_from_orm(row) if row else None
 
     async def get_by_name(self, name: str) -> Tag | None:
-        row = self._session.scalar(
-            select(TagOrm).where(TagOrm.name == name.strip().lower())
-        )
+        row = self._session.scalar(select(TagOrm).where(TagOrm.name == name.strip().lower()))
         return tag_from_orm(row) if row else None
 
     async def get_by_slug(self, slug: str) -> Tag | None:
-        row = self._session.scalar(
-            select(TagOrm).where(TagOrm.slug == slug)
-        )
+        row = self._session.scalar(select(TagOrm).where(TagOrm.slug == slug))
         return tag_from_orm(row) if row else None
 
     async def add(self, tag: Tag) -> None:
@@ -88,9 +82,7 @@ class SqlAlchemyTagRepository(ITagRepository):
         return [tag_from_orm(existing_by_name[n]) for n in unique_names]
 
     async def list_all(self) -> list[Tag]:
-        rows = self._session.scalars(
-            select(TagOrm).order_by(TagOrm.name)
-        ).all()
+        rows = self._session.scalars(select(TagOrm).order_by(TagOrm.name)).all()
         return [tag_from_orm(r) for r in rows]
 
 

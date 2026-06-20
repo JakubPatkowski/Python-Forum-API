@@ -69,9 +69,7 @@ def user_from_orm(
     )
 
 
-def refresh_token_from_orm(
-    row: RefreshTokenOrm, *, user_public_id: UUID
-) -> RefreshToken:
+def refresh_token_from_orm(row: RefreshTokenOrm, *, user_public_id: UUID) -> RefreshToken:
     return RefreshToken(
         id=RefreshTokenId(row.public_id),
         user_id=UserId(user_public_id),

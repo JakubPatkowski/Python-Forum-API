@@ -4,12 +4,12 @@ Revision ID: 0009
 Revises: 0008
 Create Date: 2026-06-01 00:00:00.000000
 
-Wątki dostają własną ikonę. Ikona to plik w tabeli ``files`` z nowym
-``owner_type = 'post_icon'`` wskazujący na ``owner_post_id`` (ten sam FK co
-załączniki, ale inny typ — nie miesza się z galerią załączników wątku).
+Threads get their own icon. The icon is a file in the ``files`` table with a new
+``owner_type = 'post_icon'`` pointing at ``owner_post_id`` (the same FK as
+attachments, but a different type -- it doesn't mix with the thread's attachment gallery).
 
-Postgres: rozszerzamy enum ``file_owner_type`` o wartość ``post_icon``.
-SQLite (testy): ``owner_type`` trzymane jako tekst, więc no-op.
+Postgres: we extend the ``file_owner_type`` enum with the value ``post_icon``.
+SQLite (tests): ``owner_type`` is stored as text, so this is a no-op.
 """
 
 from __future__ import annotations
@@ -27,12 +27,12 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        # IF NOT EXISTS chroni przed błędem przy ponownym uruchomieniu.
+        # IF NOT EXISTS guards against an error on re-run.
         op.execute("ALTER TYPE file_owner_type ADD VALUE IF NOT EXISTS 'post_icon'")
-    # SQLite: enum to zwykły VARCHAR — brak zmiany schematu.
+    # SQLite: the enum is a plain VARCHAR -- no schema change.
 
 
 def downgrade() -> None:
-    # Postgres nie wspiera usuwania wartości z enuma bez przebudowy typu.
-    # Wartość 'post_icon' jest nieszkodliwa, więc downgrade jest no-op.
+    # Postgres does not support removing a value from an enum without rebuilding the type.
+    # The 'post_icon' value is harmless, so the downgrade is a no-op.
     pass

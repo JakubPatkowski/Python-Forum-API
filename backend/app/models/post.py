@@ -11,7 +11,7 @@ from app.database import Base
 
 
 class ContentFormat(str, Enum):
-    """Format treści — używany w postach i komentarzach."""
+    """Content format -- used in posts and comments."""
 
     PLAIN = "plain"
     MARKDOWN = "markdown"

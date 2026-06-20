@@ -1,0 +1,19 @@
+# Codecov configuration.
+#
+# Goal: coverage reporting WITHOUT any notifications. Codecov is purely
+# informational here — it never comments on PRs and never blocks a merge.
+comment: false
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true   # report only; never a failing status check
+    patch:
+      default:
+        informational: true
+
+# Two suites upload separately (unit vs integration); show them as flags.
+flag_management:
+  default_rules:
+    carryforward: true

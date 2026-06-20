@@ -55,16 +55,9 @@ class SqlAlchemyFileRepository:
         return file_from_orm(orm, uploader_public_id=uploader_public_id)
 
     async def exists(self, id_: FileId) -> bool:
-        return (
-            self._s.scalar(
-                select(FileOrm.id).where(FileOrm.public_id == id_.value)
-            )
-            is not None
-        )
+        return self._s.scalar(select(FileOrm.id).where(FileOrm.public_id == id_.value)) is not None
 
-    async def list_for_owner(
-        self, owner_type: FileOwnerType, owner_public_id: UUID
-    ) -> list[File]:
+    async def list_for_owner(self, owner_type: FileOwnerType, owner_public_id: UUID) -> list[File]:
         owner_col = self._owner_column_for(owner_type)
         owner_internal = self._resolve_owner_internal(owner_type, owner_public_id)
         if owner_col is None or owner_internal is None:
@@ -80,9 +73,7 @@ class SqlAlchemyFileRepository:
             .order_by(FileOrm.created_at.asc())
         ).all()
         return [
-            file_from_orm(
-                orm, uploader_public_id=up, owner_public_id=owner_public_id
-            )
+            file_from_orm(orm, uploader_public_id=up, owner_public_id=owner_public_id)
             for orm, up in rows
         ]
 
@@ -105,9 +96,7 @@ class SqlAlchemyFileRepository:
         ).all()
         return [file_from_orm(orm, uploader_public_id=up) for orm, up in rows]
 
-    async def list_orphans(
-        self, *, older_than: datetime, limit: int
-    ) -> list[File]:
+    async def list_orphans(self, *, older_than: datetime, limit: int) -> list[File]:
         rows = self._s.execute(
             select(FileOrm, UserOrm.public_id)
             .join(UserOrm, FileOrm.uploader_id == UserOrm.id)
@@ -150,9 +139,7 @@ class SqlAlchemyFileRepository:
         self._s.flush()  # assign files.id so the avatar FK lookup can see it
 
     async def save(self, file: File) -> None:
-        row = self._s.scalar(
-            select(FileOrm).where(FileOrm.public_id == file.id.value)
-        )
+        row = self._s.scalar(select(FileOrm).where(FileOrm.public_id == file.id.value))
         if row is None:
             msg = f"File {file.id.value} not found for update"
             raise ValueError(msg)
@@ -174,9 +161,7 @@ class SqlAlchemyFileRepository:
         self._s.flush()
 
     async def remove(self, entity: File) -> None:
-        row = self._s.scalar(
-            select(FileOrm).where(FileOrm.public_id == entity.id.value)
-        )
+        row = self._s.scalar(select(FileOrm).where(FileOrm.public_id == entity.id.value))
         if row is not None:
             self._s.delete(row)
             self._s.flush()
@@ -186,7 +171,7 @@ class SqlAlchemyFileRepository:
     def _owner_column_for(self, owner_type: FileOwnerType):
         return {
             FileOwnerType.POST: FileOrm.owner_post_id,
-            # Ikona wątku korzysta z tej samej kolumny FK co załączniki posta.
+            # The thread icon uses the same FK column as post attachments.
             FileOwnerType.POST_ICON: FileOrm.owner_post_id,
             FileOwnerType.COMMENT: FileOrm.owner_comment_id,
             FileOwnerType.USER_AVATAR: FileOrm.owner_user_id,
@@ -208,9 +193,7 @@ class SqlAlchemyFileRepository:
             case _:
                 return None
 
-    def _owner_ints(
-        self, file: File
-    ) -> tuple[int | None, int | None, int | None, int | None]:
+    def _owner_ints(self, file: File) -> tuple[int | None, int | None, int | None, int | None]:
         """Map the aggregate's owner to the four nullable FK columns."""
         if file.owner_id is None or file.owner_type is FileOwnerType.STANDALONE:
             return (None, None, None, None)

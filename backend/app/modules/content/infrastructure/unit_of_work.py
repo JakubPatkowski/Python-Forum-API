@@ -90,9 +90,7 @@ class SqlAlchemyContentUnitOfWork(IContentUnitOfWork):
         if cached is not None:
             return cached
         assert self._session is not None
-        db_id = self._session.scalar(
-            select(UserOrm.id).where(UserOrm.public_id == user_public_id)
-        )
+        db_id = self._session.scalar(select(UserOrm.id).where(UserOrm.public_id == user_public_id))
         if db_id is not None:
             self._user_id_cache[user_public_id] = db_id
         return db_id

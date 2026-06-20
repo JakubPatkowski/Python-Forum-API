@@ -39,13 +39,11 @@ class CategoryResponse(BaseModel):
     slug: str
     description: str | None
     created_at: datetime
-    # public UUID właściciela (twórcy) — frontend gateuje edycję ikony.
+    # public UUID of the owner (creator) -- the frontend gates icon editing on it.
     owner_id: UUID | None = None
 
     @classmethod
-    def from_summary(
-        cls, c: CategorySummary, owner_id: UUID | None = None
-    ) -> CategoryResponse:
+    def from_summary(cls, c: CategorySummary, owner_id: UUID | None = None) -> CategoryResponse:
         return cls(
             id=c.public_id,
             name=c.name,

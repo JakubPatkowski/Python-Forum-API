@@ -26,9 +26,7 @@ class RefreshTokenOrm(Base):
     __tablename__ = "refresh_tokens"
 
     id = Column(BigInteger, primary_key=True)
-    public_id = Column(
-        SQL_UUID(as_uuid=True), nullable=False, unique=True, index=True
-    )
+    public_id = Column(SQL_UUID(as_uuid=True), nullable=False, unique=True, index=True)
     user_id = Column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -41,9 +39,7 @@ class RefreshTokenOrm(Base):
         nullable=False,
         server_default="active",
     )
-    issued_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    issued_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     replaced_by = Column(
@@ -54,6 +50,4 @@ class RefreshTokenOrm(Base):
     user_agent = Column(Text, nullable=True)
     ip_address = Column(INET, nullable=True)
 
-    __table_args__ = (
-        Index("ix_refresh_tokens_user_status", "user_id", "status"),
-    )
+    __table_args__ = (Index("ix_refresh_tokens_user_status", "user_id", "status"),)

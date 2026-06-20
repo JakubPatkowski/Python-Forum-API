@@ -45,9 +45,7 @@ class RegisterUserUseCase:
         self._hasher = hasher
         self._bus = bus
 
-    async def execute(
-        self, cmd: RegisterUserCommand
-    ) -> Result[UserSummary, DomainError]:
+    async def execute(self, cmd: RegisterUserCommand) -> Result[UserSummary, DomainError]:
         # Value-object construction validates the inputs.
         username = Username(cmd.username)
         email = Email(cmd.email)

@@ -1,0 +1,1490 @@
+# Dashboard "Forum - Presentation View" — fixed and extended version.
+# The Grafana sidecar (kube-prometheus-stack) auto-imports every ConfigMap with the
+# `grafana_dashboard: "1"` label (searchNamespace: ALL) — just `kubectl apply`.
+#
+# Fixed bugs (causes of "No data"):
+#  - CPU/RAM per pod: the old queries filtered by container="backend" and cluster="forum-wedkarskie"
+#    — those labels do NOT exist in cAdvisor metrics on minikube. Now: pod=~"..." + cpu="total"
+#    (the same pattern as in the working "Forum Overview").
+#  - Error rate: no 5xx gave an empty result ("No data") — now `or vector(0)` + clamp_min.
+#  - Loki panel: `|= "ERROR" or {...}` is invalid LogQL — now a single stream + regex.
+#
+#   kubectl apply -f k8s/monitoring/grafana-dashboard-presentation.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-presentation
+  namespace: forum-wedkarskie
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: forum-wedkarskie
+data:
+  forum-presentation.json: |
+    {
+      "title": "Forum - Presentation View",
+      "uid": "forum-presentation",
+      "tags": [
+        "forum",
+        "presentation"
+      ],
+      "timezone": "browser",
+      "refresh": "1m",
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "schemaVersion": 39,
+      "editable": true,
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "pluginId": "prometheus",
+            "query": "prometheus",
+            "label": "Prometheus",
+            "current": {},
+            "hide": 0
+          },
+          {
+            "name": "loki_ds",
+            "type": "datasource",
+            "pluginId": "loki",
+            "query": "loki",
+            "label": "Loki",
+            "current": {},
+            "hide": 0
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Request rate (req/s)",
+          "description": "Total HTTP requests/s to the backend (all pods).",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "decimals": 1,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{namespace=\"forum-wedkarskie\"}[1m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Error rate (5xx %)",
+          "description": "Share of 5xx responses (5m). `or vector(0)` + clamp_min: 0.00% instead of No data when there are no errors.",
+          "gridPos": {
+            "x": 4,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 2,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "100 * (sum(rate(http_requests_total{namespace=\"forum-wedkarskie\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_requests_total{namespace=\"forum-wedkarskie\"}[5m])), 1)",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "p95 latency",
+          "description": "95th percentile of response time (5m).",
+          "gridPos": {
+            "x": 8,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "yellow"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "yellow",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Backend pods (HPA)",
+          "description": "Current number of backend replicas per the HPA.",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "max(kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Frontend pods (HPA)",
+          "description": "Current number of frontend replicas per the HPA.",
+          "gridPos": {
+            "x": 16,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "max(kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"frontend\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Pod restarts (1h)",
+          "description": "Container restarts in the last hour (increase, not the counter since pod start).",
+          "gridPos": {
+            "x": 20,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "orientation": "auto",
+            "textMode": "value_and_name",
+            "colorMode": "background"
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"forum-wedkarskie\"}[1h])) or vector(0)",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "row",
+          "title": "Autoscaling (HPA) — watch this during load tests",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 4,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "HPA backend: replicas (current / desired / min / max / ready)",
+          "description": "Full scaling picture: desired > current = the HPA wants to add pods; ready < current = pods are still starting.",
+          "gridPos": {
+            "x": 0,
+            "y": 5,
+            "w": 8,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5,
+                "lineInterpolation": "stepAfter"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "current"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "desired"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_spec_min_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}",
+              "refId": "C",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "min"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"backend\"}",
+              "refId": "D",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "max"
+            },
+            {
+              "expr": "kube_deployment_status_replicas_available{namespace=\"forum-wedkarskie\",deployment=\"backend\"}",
+              "refId": "E",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "ready"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Backend: CPU vs HPA target (70% of request)",
+          "description": "Average CPU usage as % of request (100m/pod). Crossing the 70% line triggers scale-up. cAdvisor on minikube: select by pod + cpu=\"total\" (no container label).",
+          "gridPos": {
+            "x": 8,
+            "y": 5,
+            "w": 8,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "100 * sum(rate(container_cpu_usage_seconds_total{namespace=\"forum-wedkarskie\",pod=~\"backend-.*\",cpu=\"total\"}[1m])) / sum(kube_pod_container_resource_requests{namespace=\"forum-wedkarskie\",resource=\"cpu\",container=\"backend\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "CPU % of request (avg pods)"
+            },
+            {
+              "expr": "vector(70)",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "HPA target (70%)"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Backend: RAM vs HPA target (80% of request)",
+          "description": "Working set as % of memory request (128Mi/pod). The backend HPA\u2019s second trigger (80%).",
+          "gridPos": {
+            "x": 16,
+            "y": 5,
+            "w": 8,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "100 * sum(container_memory_working_set_bytes{namespace=\"forum-wedkarskie\",pod=~\"backend-.*\"}) / sum(kube_pod_container_resource_requests{namespace=\"forum-wedkarskie\",resource=\"memory\",container=\"backend\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "RAM % of request (avg pods)"
+            },
+            {
+              "expr": "vector(80)",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "HPA target (80%)"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "HPA frontend: replicas",
+          "description": "Frontend scaling (target: 70% CPU of the 50m request).",
+          "gridPos": {
+            "x": 0,
+            "y": 13,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5,
+                "lineInterpolation": "stepAfter"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"frontend\"}",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "current"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"frontend\"}",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "desired"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"forum-wedkarskie\",horizontalpodautoscaler=\"frontend\"}",
+              "refId": "C",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "max"
+            },
+            {
+              "expr": "kube_deployment_status_replicas_available{namespace=\"forum-wedkarskie\",deployment=\"frontend\"}",
+              "refId": "D",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "ready"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Frontend: CPU vs HPA target (70% of request)",
+          "description": "Nginx is lightweight — usually far from the threshold.",
+          "gridPos": {
+            "x": 8,
+            "y": 13,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "100 * sum(rate(container_cpu_usage_seconds_total{namespace=\"forum-wedkarskie\",pod=~\"frontend-.*\",cpu=\"total\"}[1m])) / sum(kube_pod_container_resource_requests{namespace=\"forum-wedkarskie\",resource=\"cpu\",container=\"frontend\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "CPU % of request (avg pods)"
+            },
+            {
+              "expr": "vector(70)",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "HPA target (70%)"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "Container restarts per pod (increase 5m)",
+          "description": "Spikes = crash-loop / OOMKill during the test.",
+          "gridPos": {
+            "x": 16,
+            "y": 13,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5,
+                "lineInterpolation": "stepAfter"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by(pod) (increase(kube_pod_container_status_restarts_total{namespace=\"forum-wedkarskie\"}[5m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "row",
+          "title": "HTTP request statistics (backend)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "Request rate per endpoint",
+          "description": "Requests/s per route template (excluding /metrics, health checks, and probes on /).",
+          "gridPos": {
+            "x": 0,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by(handler, method) (rate(http_requests_total{namespace=\"forum-wedkarskie\",handler!~\"/metrics|/health.*|/|none\"}[1m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{method}} {{handler}}"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "HTTP responses by status class",
+          "description": "2xx/3xx/4xx/5xx per second — all backend traffic.",
+          "gridPos": {
+            "x": 12,
+            "y": 21,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by(status) (rate(http_requests_total{namespace=\"forum-wedkarskie\"}[1m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{status}}"
+            }
+          ]
+        },
+        {
+          "id": 17,
+          "type": "timeseries",
+          "title": "Latency p50 / p95 / p99",
+          "description": "Response-time percentiles. A p50/p99 divergence under load = queueing/contention.",
+          "gridPos": {
+            "x": 0,
+            "y": 29,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_highr_seconds_bucket{namespace=\"forum-wedkarskie\"}[5m])) by (le))",
+              "refId": "C",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "id": 18,
+          "type": "timeseries",
+          "title": "p95 latency per endpoint (top 5)",
+          "description": "The slowest endpoints — candidates for optimization.",
+          "gridPos": {
+            "x": 12,
+            "y": 29,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "topk(5, histogram_quantile(0.95, sum by(handler, le) (rate(http_request_duration_seconds_bucket{namespace=\"forum-wedkarskie\",handler!~\"/metrics|/health.*|/|none\"}[5m]))))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{handler}}"
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "type": "row",
+          "title": "Resources per pod (backend / frontend / postgres / minio)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 37,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 20,
+          "type": "timeseries",
+          "title": "CPU per pod (cores)",
+          "description": "All pods in the namespace (1.0 = a full vCPU). cAdvisor on minikube: cpu=\"total\", summed by pod.",
+          "gridPos": {
+            "x": 0,
+            "y": 38,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by(pod) (rate(container_cpu_usage_seconds_total{namespace=\"forum-wedkarskie\",pod!=\"\",cpu=\"total\"}[1m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "RAM working set per pod",
+          "description": "Resident memory minus cache — this is what the OOM killer watches. Comparable to `kubectl top pods`.",
+          "gridPos": {
+            "x": 12,
+            "y": 38,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by(pod) (container_memory_working_set_bytes{namespace=\"forum-wedkarskie\",pod!=\"\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "type": "timeseries",
+          "title": "CPU as % of request per pod",
+          "description": "Usage relative to the declared request — >100% = the pod takes more than it reserved.",
+          "gridPos": {
+            "x": 0,
+            "y": 46,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "100 * sum by(pod) (rate(container_cpu_usage_seconds_total{namespace=\"forum-wedkarskie\",pod!=\"\",cpu=\"total\"}[1m])) / on(pod) sum by(pod) (kube_pod_container_resource_requests{namespace=\"forum-wedkarskie\",resource=\"cpu\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "RAM as % of limit per pod",
+          "description": "100% = OOMKill. Pods without limits have no series.",
+          "gridPos": {
+            "x": 12,
+            "y": 46,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "max": 100,
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "100 * sum by(pod) (container_memory_working_set_bytes{namespace=\"forum-wedkarskie\",pod!=\"\"}) / on(pod) sum by(pod) (kube_pod_container_resource_limits{namespace=\"forum-wedkarskie\",resource=\"memory\"})",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 24,
+          "type": "row",
+          "title": "Node (minikube)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 54,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 25,
+          "type": "timeseries",
+          "title": "Node CPU usage",
+          "description": "Total CPU load of the node.",
+          "gridPos": {
+            "x": 0,
+            "y": 55,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "max": 1,
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[2m]))",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "CPU used"
+            }
+          ]
+        },
+        {
+          "id": 26,
+          "type": "timeseries",
+          "title": "Node memory",
+          "description": "Node memory: used vs total.",
+          "gridPos": {
+            "x": 8,
+            "y": 55,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "used"
+            },
+            {
+              "expr": "node_memory_MemTotal_bytes",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "total"
+            }
+          ]
+        },
+        {
+          "id": 27,
+          "type": "timeseries",
+          "title": "Node load average",
+          "description": "Load > number of CPUs = node saturation.",
+          "gridPos": {
+            "x": 16,
+            "y": 55,
+            "w": 8,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_load1",
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "load1"
+            },
+            {
+              "expr": "node_load5",
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "load5"
+            },
+            {
+              "expr": "count(node_cpu_seconds_total{mode=\"idle\"})",
+              "refId": "C",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "legendFormat": "CPU count"
+            }
+          ]
+        },
+        {
+          "id": 28,
+          "type": "row",
+          "title": "Logs (Loki)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 62,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 29,
+          "type": "logs",
+          "title": "Backend: errors and warnings",
+          "description": "Correct LogQL (the old version used an invalid `or` between streams).",
+          "gridPos": {
+            "x": 0,
+            "y": 63,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_ds}"
+          },
+          "options": {
+            "showTime": true,
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"forum-wedkarskie\", pod=~\"backend-.*\"} |~ \"(?i)(error|warning|exception|traceback)\"",
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_ds}"
+              }
+            }
+          ]
+        },
+        {
+          "id": 30,
+          "type": "logs",
+          "title": "All namespace logs",
+          "description": "Full log stream from all pods, newest on top.",
+          "gridPos": {
+            "x": 12,
+            "y": 63,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_ds}"
+          },
+          "options": {
+            "showTime": true,
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"forum-wedkarskie\"}",
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "${loki_ds}"
+              }
+            }
+          ]
+        }
+      ]
+    }

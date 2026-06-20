@@ -42,8 +42,8 @@ class FileOwnerType(StrEnum):
 
     STANDALONE = "standalone"
     POST = "post"
-    # Ikona/miniatura wątku — osobny typ od zwykłych załączników (POST), żeby nie
-    # mieszać się z galerią załączników. Wskazuje na ten sam FK ``owner_post_id``.
+    # Thread icon/thumbnail -- a separate type from regular attachments (POST) so
+    # it doesn't mix with the attachment gallery. Points to the same FK ``owner_post_id``.
     POST_ICON = "post_icon"
     COMMENT = "comment"
     USER_AVATAR = "user_avatar"

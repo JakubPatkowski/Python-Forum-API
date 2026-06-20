@@ -29,9 +29,7 @@ class UpdateCommentUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: UpdateCommentCommand
-    ) -> Result[CommentSummary, DomainError]:
+    async def execute(self, cmd: UpdateCommentCommand) -> Result[CommentSummary, DomainError]:
         comment_id = CommentId(cmd.comment_public_id)
         actor_id = UserId(cmd.actor_public_id)
 

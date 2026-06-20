@@ -108,9 +108,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
-    app.include_router(
-        admin_users_router, prefix="/api/v1/admin/users", tags=["admin-users"]
-    )
+    app.include_router(admin_users_router, prefix="/api/v1/admin/users", tags=["admin-users"])
 
     # Step 7b — phase-2 content routers (modular monolith).
     from app.modules.content.presentation import (
@@ -121,12 +119,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(posts_router, prefix="/api/v1/posts", tags=["posts"])
-    app.include_router(
-        comments_router, prefix="/api/v1/comments", tags=["comments"]
-    )
-    app.include_router(
-        categories_router, prefix="/api/v1/categories", tags=["categories"]
-    )
+    app.include_router(comments_router, prefix="/api/v1/comments", tags=["comments"])
+    app.include_router(categories_router, prefix="/api/v1/categories", tags=["categories"])
     app.include_router(tags_router, prefix="/api/v1/tags", tags=["tags"])
 
     # Step 7c — phase-3 files module (generic upload to MinIO). Mounted at
@@ -136,8 +130,8 @@ def create_app() -> FastAPI:
 
     app.include_router(files_router, prefix="/api/v1", tags=["files"])
 
-    # Step 7c.bis — engagement (polubienia + statystyki usera). Cienki moduł SQL;
-    # mount na /api/v1 (ścieżki .../{id}/like, /users/{id}/stats).
+    # Step 7c.bis -- engagement (likes + user stats). Thin SQL module;
+    # mounted at /api/v1 (paths .../{id}/like, /users/{id}/stats).
     from app.modules.engagement.router import router as engagement_router
 
     app.include_router(engagement_router, prefix="/api/v1", tags=["engagement"])

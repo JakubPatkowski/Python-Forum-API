@@ -60,9 +60,7 @@ class MinioFileStorage(IFileStorage):
             self._internal.make_bucket(self._bucket)
             logger.info("minio_bucket_created", bucket=self._bucket)
 
-    async def presigned_put_url(
-        self, key: str, *, content_type: str, expires_seconds: int
-    ) -> str:
+    async def presigned_put_url(self, key: str, *, content_type: str, expires_seconds: int) -> str:
         # content_type is informational: a PUT presign does not sign headers.
         return await anyio.to_thread.run_sync(
             lambda: self._public.presigned_put_object(
@@ -137,9 +135,7 @@ class MinioFileStorage(IFileStorage):
         return ObjectStat(size_bytes=obj.size or 0, content_type=obj.content_type)
 
     async def remove(self, key: str) -> None:
-        await anyio.to_thread.run_sync(
-            lambda: self._internal.remove_object(self._bucket, key)
-        )
+        await anyio.to_thread.run_sync(lambda: self._internal.remove_object(self._bucket, key))
 
     async def remove_many(self, keys: Iterable[str]) -> None:
         key_list = [k for k in keys if k]
@@ -148,8 +144,6 @@ class MinioFileStorage(IFileStorage):
         await anyio.to_thread.run_sync(self._remove_many_sync, key_list)
 
     def _remove_many_sync(self, keys: list[str]) -> None:
-        errors = self._internal.remove_objects(
-            self._bucket, (DeleteObject(k) for k in keys)
-        )
+        errors = self._internal.remove_objects(self._bucket, (DeleteObject(k) for k in keys))
         for error in errors:
             logger.warning("minio_delete_failed", error=str(error))

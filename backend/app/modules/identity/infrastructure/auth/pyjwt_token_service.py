@@ -50,12 +50,8 @@ class PyJWTTokenService(ITokenService):
     ) -> None:
         self._secret = secret_key or settings.SECRET_KEY
         self._algo = algorithm or settings.ALGORITHM
-        self._access_ttl = timedelta(
-            minutes=access_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-        self._refresh_ttl = timedelta(
-            days=refresh_days or settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
+        self._access_ttl = timedelta(minutes=access_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        self._refresh_ttl = timedelta(days=refresh_days or settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     # --- access -------------------------------------------------------------
 

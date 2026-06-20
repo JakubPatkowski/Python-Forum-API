@@ -178,9 +178,7 @@ class Comment(AggregateRoot[CommentId]):
         self._is_deleted = True
         # Replace the body so the API can render a "[deleted]" placeholder
         # without the original body leaking.
-        self._content = MarkdownContent(
-            body=DELETED_PLACEHOLDER, format=self._content.format
-        )
+        self._content = MarkdownContent(body=DELETED_PLACEHOLDER, format=self._content.format)
         self._touch()
         self.record_event(
             CommentDeleted(

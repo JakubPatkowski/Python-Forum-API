@@ -29,14 +29,14 @@ class Comment(Base):
         default=ContentFormat.MARKDOWN,
         nullable=False,
     )
-    # Self-FK do zagnieżdżania
+    # Self-FK for nesting
     parent_id = Column(
         Integer,
         ForeignKey("comments.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-    # Cache stopnia zagnieżdżenia (0 = top-level). Walidowane w warstwie service.
+    # Cached nesting depth (0 = top-level). Validated in the service layer.
     depth = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

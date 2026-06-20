@@ -9,14 +9,15 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-import app.models  # noqa: F401 - side-effect import registers legacy ORM mappers
-import app.modules.content.infrastructure.orm  # noqa: F401 - phase-2 mappers (tags, post_tags)
-import app.modules.files.infrastructure.orm  # noqa: F401 - phase-3 mappers (files)
+from sqlalchemy import engine_from_config, pool
+
+import app.models
+import app.modules.content.infrastructure.orm
+import app.modules.files.infrastructure.orm
 import app.modules.identity.infrastructure.orm  # noqa: F401 - phase-1 mappers
 from alembic import context
 from app.config import settings
 from app.shared.infrastructure.db import Base
-from sqlalchemy import engine_from_config, pool
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

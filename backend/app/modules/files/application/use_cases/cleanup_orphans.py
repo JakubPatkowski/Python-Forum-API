@@ -23,9 +23,7 @@ class CleanupOrphansUseCase:
     returned count is zero.
     """
 
-    def __init__(
-        self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus
-    ) -> None:
+    def __init__(self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus) -> None:
         self._uow = uow
         self._storage = storage
         self._bus = bus

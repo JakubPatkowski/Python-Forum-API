@@ -1,13 +1,11 @@
 """Upload size limit middleware.
 
-Odrzuca requesty POST/PUT/PATCH, których Content-Length przekracza
-skonfigurowany limit (`settings.MAX_UPLOAD_SIZE_BYTES`).
+Rejects POST/PUT/PATCH requests whose Content-Length exceeds the
+configured limit (`settings.MAX_UPLOAD_SIZE_BYTES`).
 
-- Brak nagłówka Content-Length → 411 Length Required.
-- Nieprawidłowa wartość Content-Length → 400 Bad Request.
-- Za duży payload → 413 Request Entity Too Large.
-
-Wzorowane na middleware z projektu kolegi (PythonBackendForum).
+- Missing Content-Length header -> 411 Length Required.
+- Invalid Content-Length value -> 400 Bad Request.
+- Payload too large -> 413 Request Entity Too Large.
 """
 
 from __future__ import annotations
@@ -22,15 +20,13 @@ logger = structlog.get_logger()
 
 
 class LimitUploadSizeMiddleware(BaseHTTPMiddleware):
-    """Ogranicza rozmiar uploadów na poziomie middleware."""
+    """Limits upload size at the middleware level."""
 
     def __init__(self, app: ASGIApp, *, max_upload_size: int) -> None:
         super().__init__(app)
         self.max_upload_size = max_upload_size
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method in ("POST", "PUT", "PATCH"):
             raw = request.headers.get("content-length")
             if raw is None:

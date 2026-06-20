@@ -139,6 +139,14 @@ frontend/src/api-client/
 # Legacy dashboard.html in repo root — was a one-off mockup, do not commit.
 /dashboard.html
 
+# Generated load-test reports/samples. Keep only the committed example.
+load/results/*
+!load/results/report-przyklad.html
+
+# Submission deliverables (regenerated from docs/code, not source of truth).
+/Dokumentacja_Forum_Wedkarskie.docx
+/Projekt_Jakub_Patkowski_Hubert_Ożarowski.pdf
+
 # Claude
 CLAUDE.md
 memory/

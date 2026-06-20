@@ -37,6 +37,10 @@ spec:
           env:
             - name: BASE_URL
               value: "http://backend-service:8000"
+            # Profil obciążenia: smoke | demo | stress (patrz load/k6-load-test.js).
+            # run-load-test.ps1 podmienia tę wartość parametrem -TestProfile.
+            - name: PROFILE
+              value: "demo" # k6-profile-marker
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

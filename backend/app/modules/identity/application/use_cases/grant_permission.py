@@ -20,9 +20,7 @@ class GrantPermissionUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: GrantPermissionCommand
-    ) -> Result[None, DomainError]:
+    async def execute(self, cmd: GrantPermissionCommand) -> Result[None, DomainError]:
         async with self._uow as uow:
             user = await uow.users.get(UserId(cmd.target_user_public_id))
             if user is None:
@@ -44,9 +42,7 @@ class DenyPermissionUseCase:
         self._uow = uow
         self._bus = bus
 
-    async def execute(
-        self, cmd: DenyPermissionCommand
-    ) -> Result[None, DomainError]:
+    async def execute(self, cmd: DenyPermissionCommand) -> Result[None, DomainError]:
         async with self._uow as uow:
             user = await uow.users.get(UserId(cmd.target_user_public_id))
             if user is None:

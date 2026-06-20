@@ -26,16 +26,12 @@ from app.shared.domain.errors import DomainError, PermissionDeniedError
 class AttachFilesUseCase:
     """Attach one or more files to a post, comment or category."""
 
-    def __init__(
-        self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus
-    ) -> None:
+    def __init__(self, uow: IFilesUnitOfWork, storage: IFileStorage, bus: IEventBus) -> None:
         self._uow = uow
         self._storage = storage
         self._bus = bus
 
-    async def execute(
-        self, cmd: AttachFilesCommand
-    ) -> Result[list[FileView], DomainError]:
+    async def execute(self, cmd: AttachFilesCommand) -> Result[list[FileView], DomainError]:
         async with self._uow as uow:
             authz = await self._authorize_owner(uow, cmd)
             if authz is not None:
@@ -48,14 +44,9 @@ class AttachFilesUseCase:
                     return Err(FileNotFound(str(fid)))
                 if not file.is_ready:
                     return Err(FileNotReady(str(fid)))
-                if (
-                    file.uploader_id.value != cmd.actor_public_id
-                    and not cmd.actor_can_moderate
-                ):
+                if file.uploader_id.value != cmd.actor_public_id and not cmd.actor_can_moderate:
                     return Err(PermissionDeniedError("Not your file"))
-                file.attach_to(
-                    owner_type=cmd.owner_type, owner_public_id=cmd.owner_public_id
-                )
+                file.attach_to(owner_type=cmd.owner_type, owner_public_id=cmd.owner_public_id)
                 await uow.files.save(file)
                 attached.append(file)
 

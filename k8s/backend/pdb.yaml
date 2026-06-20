@@ -1,6 +1,8 @@
 # PodDisruptionBudget — keeps at least 1 backend pod serving during voluntary
-# disruptions (node drain, rolling update, cluster upgrade). Pairs with the
-# HPA minReplicas: 2 so a drain can never take the API fully offline.
+# disruptions (node drain, rolling update, cluster upgrade). NOTE: the HPA can
+# scale the backend down to minReplicas: 1; when only one pod is running this
+# budget will block a voluntary eviction (e.g. node drain) until the HPA or a
+# manual scale-up provides a second pod.
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
