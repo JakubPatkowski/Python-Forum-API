@@ -33,8 +33,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up pnpm
-        # Version is taken from the "packageManager" field in package.json.
+        # action-setup runs from the repo root, where there is no package.json,
+        # so it can't read "packageManager" from frontend/package.json — pin the
+        # version explicitly (keep in sync with frontend/package.json).
         uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

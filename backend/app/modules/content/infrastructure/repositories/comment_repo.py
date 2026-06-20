@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -128,11 +129,13 @@ class SqlAlchemyCommentRepository(ICommentRepository):
                 r,
                 post_public_id=post_public_id_value,
                 parent_public_id=(
-                    parent_public_ids.get(r.parent_id) if r.parent_id is not None else None
+                    parent_public_ids.get(cast(int, r.parent_id))
+                    if r.parent_id is not None
+                    else None
                 ),
                 author=(
                     authors.get(
-                        r.author_id,
+                        cast(int, r.author_id),
                         AuthorSummary(public_id=None, username=None),
                     )
                     if r.author_id is not None

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from datetime import datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -257,7 +258,7 @@ class SqlAlchemyPostRepository(IPostRepository):
 
         author_ids = {r.author_id for r in rows if r.author_id is not None}
         category_ids = {r.category_id for r in rows if r.category_id is not None}
-        post_ids = [r.id for r in rows]
+        post_ids = [cast(int, r.id) for r in rows]
 
         # --- authors: id -> AuthorSummary -------------------------------------
         authors: dict[int, AuthorSummary] = {}
@@ -307,10 +308,16 @@ class SqlAlchemyPostRepository(IPostRepository):
         return tuple(
             post_summary_from_row(
                 row,
-                author=authors.get(row.author_id, AuthorSummary(public_id=None, username=None)),
-                category=categories.get(row.category_id) if row.category_id is not None else None,
-                tags=tuple(tags_by_post.get(row.id, ())),
-                comment_count=counts_by_post.get(row.id, 0),
+                author=authors.get(
+                    cast(int, row.author_id), AuthorSummary(public_id=None, username=None)
+                ),
+                category=(
+                    categories.get(cast(int, row.category_id))
+                    if row.category_id is not None
+                    else None
+                ),
+                tags=tuple(tags_by_post.get(cast(int, row.id), ())),
+                comment_count=counts_by_post.get(cast(int, row.id), 0),
             )
             for row in rows
         )
