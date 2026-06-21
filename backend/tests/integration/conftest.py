@@ -42,6 +42,7 @@ def postgres_url() -> Iterator[str]:
 def app(postgres_url: str) -> Any:
     """Aplikacja FastAPI po migracji schematu do najnowszej rewizji."""
     from alembic.config import Config
+    from sqlalchemy import create_engine
 
     from alembic import command
 
@@ -49,8 +50,21 @@ def app(postgres_url: str) -> Any:
     cfg.set_main_option("sqlalchemy.url", postgres_url)
     command.upgrade(cfg, "head")
 
-    # Późny import: env DATABASE_URL musi być już ustawiony, by silnik wskazał
-    # właściwy kontener.
+    # KLUCZOWE: globalny `engine`/`SessionLocal` w app.shared.infrastructure.db
+    # powstają RAZ przy pierwszym imporcie z `settings.DATABASE_URL`. W zadaniu
+    # integracyjnym ten import zdarza się już na etapie kolekcji (inny moduł
+    # testowy importuje `app.*` na górze pliku) — ZANIM ten fixture ustawi
+    # DATABASE_URL — więc silnik zostaje przypięty do domyślnego localhost:5432.
+    # Przepinamy WSPÓŁDZIELONY sessionmaker na bazę kontenera: `.configure()`
+    # mutuje ten sam obiekt, którego referencję trzymają `get_db` ORAZ use-case'y
+    # z container.py, więc wszystkie ścieżki naraz celują w testową bazę.
+    from app.shared.infrastructure import db as db_module
+
+    test_engine = create_engine(postgres_url, pool_pre_ping=True, future=True)
+    db_module.engine = test_engine
+    db_module.SessionLocal.configure(bind=test_engine)
+
+    # Późny import: dopiero teraz montujemy aplikację (silnik już przepięty).
     from app.main import create_app
 
     return create_app()

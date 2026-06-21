@@ -12,6 +12,8 @@ start-up cost. Requires Docker (provided by CI).
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
 pytest.importorskip("httpx")
@@ -45,7 +47,10 @@ async def test_category_post_comment_round_trip(client: AsyncClient) -> None:
     auth = {"Authorization": f"Bearer {token}"}
 
     # --- create a category (any logged-in user may, per category.create) ----
-    resp = await client.post("/api/v1/categories", json={"name": "Spinning"}, headers=auth)
+    # Unikalna nazwa: migracja 0005 zasiewa domyślne kategorie (m.in. „Spinning"),
+    # więc stała nazwa kolidowałaby (409 CATEGORY_EXISTS) na zmigrowanej bazie.
+    category_name = f"Spinning {uuid4().hex[:8]}"
+    resp = await client.post("/api/v1/categories", json={"name": category_name}, headers=auth)
     assert resp.status_code == 201, resp.text
     category_id = resp.json()["id"]
 
@@ -63,7 +68,9 @@ async def test_category_post_comment_round_trip(client: AsyncClient) -> None:
     assert resp.status_code == 201, resp.text
     post = resp.json()
     post_id = post["id"]
-    assert post["category"]["id"] == category_id
+    # CategoryRefResponse osadzony w poście używa `public_id` (CategoryResponse
+    # z endpointu kategorii zwraca to samo UUID jako `id`).
+    assert post["category"]["public_id"] == category_id
     assert {t["name"] for t in post["tags"]} == {"perch", "spinning"}
 
     # --- read it back -------------------------------------------------------
