@@ -93,16 +93,25 @@ async def test_full_auth_flow_with_reuse_detection(client: AsyncClient) -> None:
     assert "post.create" in me["permissions"]
 
     # --- refresh -----------------------------------------------------------
+    # The /auth/refresh endpoint prefers the httpOnly cookie (browser path) and
+    # falls back to the JSON body for non-browser clients. ``AsyncClient`` keeps
+    # a cookie jar, so login + each refresh would silently overwrite the cookie
+    # with the freshly rotated token — masking the body token we want to test.
+    # Clear the jar before every refresh so this models a pure API client that
+    # only ever sends the explicit ``refresh_token`` in the body.
+    client.cookies.clear()
     resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert resp.status_code == 200, resp.text
     refresh2 = resp.json()["refresh_token"]
     assert refresh2 != refresh1
 
     # --- reuse of the old refresh => 401 + all sessions revoked -----------
+    client.cookies.clear()
     resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert resp.status_code == 401, resp.text
     assert resp.json()["error"]["code"] == "REFRESH_TOKEN_REUSE"
 
     # The rotated successor token must also be unusable now.
+    client.cookies.clear()
     resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh2})
     assert resp.status_code == 401, resp.text
