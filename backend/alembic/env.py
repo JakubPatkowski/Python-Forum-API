@@ -20,7 +20,11 @@ from app.config import settings
 from app.shared.infrastructure.db import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Honor a URL explicitly provided on the Alembic config (np. ustawiony przez
+# testy integracyjne na kontener testcontainers). Tylko gdy go brak — np. CLI
+# `alembic upgrade head` w kontenerze/k8s — sięgamy po ustawienia aplikacji.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:  # pragma: no cover
     fileConfig(config.config_file_name)
@@ -28,10 +32,14 @@ if config.config_file_name is not None:  # pragma: no cover
 target_metadata = Base.metadata
 
 
+def _effective_url() -> str:
+    return config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
+
+
 def run_migrations_offline() -> None:
     """Run migrations without a live DB connection (emits SQL to stdout)."""
     context.configure(
-        url=settings.DATABASE_URL,
+        url=_effective_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

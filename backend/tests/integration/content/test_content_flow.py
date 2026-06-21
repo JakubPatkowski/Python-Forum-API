@@ -12,47 +12,15 @@ start-up cost. Requires Docker (provided by CI).
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
-pytest.importorskip("testcontainers.postgres")
 pytest.importorskip("httpx")
 
-from httpx import ASGITransport, AsyncClient
-from testcontainers.postgres import PostgresContainer
+from httpx import AsyncClient
 
+# postgres_url / app / client pochodzą z tests/integration/conftest.py
+# (jeden współdzielony kontener Postgresa na całą sesję).
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture(scope="module")
-def postgres_url() -> str:
-    with PostgresContainer("postgres:16-alpine") as container:
-        url = container.get_connection_url().replace("psycopg2", "psycopg")
-        os.environ["DATABASE_URL"] = url
-        yield url
-
-
-@pytest.fixture(scope="module")
-def app(postgres_url: str):
-    from alembic.config import Config
-
-    from alembic import command
-
-    cfg = Config("alembic.ini")
-    cfg.set_main_option("sqlalchemy.url", postgres_url)
-    command.upgrade(cfg, "head")
-
-    from app.main import create_app
-
-    return create_app()
-
-
-@pytest.fixture
-async def client(app):
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
 
 
 async def _register_and_login(client: AsyncClient, *, username: str) -> str:

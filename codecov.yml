@@ -4,10 +4,16 @@
 # informational here — it never comments on PRs and never blocks a merge.
 comment: false
 
+# Badge/treemap colour is driven by `range`: <65% red, ~65-80% orange→yellow,
+# ≥80% green. Cel projektu = 80% (zielony), ale status zostaje informacyjny —
+# zgodnie z polityką „report only, never block".
 coverage:
+  range: "65...80"
   status:
     project:
       default:
+        target: 80%           # zielono dopiero od 80% pokrycia
+        threshold: 1%         # tolerancja drobnych wahań między uploadami
         informational: true   # report only; never a failing status check
     patch:
       default:

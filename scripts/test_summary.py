@@ -180,8 +180,11 @@ def parse_junit(junit_paths: list[Path]) -> JUnitTotals:
 
 
 def _bar(pct: float) -> str:
+    # Segmenty geometryczne (U+25B0/U+25B1) zamiast cieniowanych bloków (█/░):
+    # ░ renderuje się jako rzadkie kropki ("halftone") i wygląda brzydko w
+    # tabeli Markdown. ▰/▱ to czysty, jednolity pasek bez kropek.
     filled = round(pct / 10)
-    return "█" * filled + "░" * (10 - filled)
+    return "▰" * filled + "▱" * (10 - filled)
 
 
 def render(coverage: dict[str, Cov], overall: Cov, junit: JUnitTotals) -> str:
