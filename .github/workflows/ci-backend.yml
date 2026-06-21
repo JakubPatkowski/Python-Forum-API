@@ -90,10 +90,12 @@ jobs:
         run: >
           uv run pytest -m "not integration"
           --cov=app --cov-report=xml:coverage-unit.xml --cov-report=term-missing
+          --junitxml=junit-unit.xml -o junit_family=legacy
       - name: Integration tests (testcontainers Postgres)
         run: >
-          uv run pytest tests/integration/identity -m integration
+          uv run pytest tests/integration -m integration
           --cov=app --cov-append --cov-report=xml:coverage-integration.xml
+          --junitxml=junit-integration.xml -o junit_family=legacy
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
@@ -103,3 +105,37 @@ jobs:
           flags: backend
           # Never fail the build because the coverage upload had a hiccup.
           fail_ci_if_error: false
+      - name: Upload test results to Codecov (Test Analytics)
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: backend/junit-unit.xml,backend/junit-integration.xml
+          flags: backend
+      # Parse coverage + JUnit into a per-module Markdown summary. It is written
+      # to the run's job summary (visible in the Actions UI) and injected into
+      # README.md between the TEST-SUMMARY markers. coverage-integration.xml is
+      # cumulative (the integration step ran with --cov-append) so it carries
+      # both suites; if integration was skipped we fall back to the unit report.
+      - name: Generate test & coverage summary
+        if: ${{ !cancelled() }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          COV=backend/coverage-integration.xml
+          [ -f "$COV" ] || COV=backend/coverage-unit.xml
+          python scripts/test_summary.py \
+            --coverage "$COV" \
+            --junit backend/junit-unit.xml backend/junit-integration.xml \
+            --readme README.md
+      - name: Upload summary + reports as artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-summary
+          path: |
+            README.md
+            backend/coverage-unit.xml
+            backend/coverage-integration.xml
+            backend/junit-unit.xml
+            backend/junit-integration.xml
+          if-no-files-found: ignore

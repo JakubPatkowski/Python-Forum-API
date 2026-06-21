@@ -17,3 +17,35 @@ coverage:
 flag_management:
   default_rules:
     carryforward: true
+
+# Components = virtual, path-based views over the same coverage upload. One per
+# backend domain module, so the Codecov UI can break coverage down by module
+# without needing a separate upload per module. Statuses stay informational —
+# consistent with the "report only, never block" policy above.
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        informational: true
+  individual_components:
+    - component_id: module_identity
+      name: identity
+      paths:
+        - backend/app/modules/identity/**
+    - component_id: module_content
+      name: content
+      paths:
+        - backend/app/modules/content/**
+    - component_id: module_files
+      name: files
+      paths:
+        - backend/app/modules/files/**
+    - component_id: module_engagement
+      name: engagement
+      paths:
+        - backend/app/modules/engagement/**
+    - component_id: module_shared
+      name: shared
+      paths:
+        - backend/app/shared/**

@@ -102,7 +102,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S106"]         # asserts & hardcoded passwords OK in tests
+"tests/**" = ["S101", "S106", "S107"]  # asserts & hardcoded test passwords OK in tests
 # Domain errors use intent-revealing names (PostNotFound, EmailAlreadyExists, …)
 # rather than the generic *Error suffix that N818 wants.
 "**/application/errors.py" = ["N818"]

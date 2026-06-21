@@ -44,13 +44,10 @@ FastAPI backend · React SPA · PostgreSQL · deployed on Kubernetes with full o
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-v0.3.0-blue)
 
-</div>
+<!-- ───────────── Live docs ───────────── -->
+[![API Docs — Redoc](https://img.shields.io/badge/API%20docs-Redoc-6BA539?logo=openapiinitiative&logoColor=white)](https://jakubpatkowski.github.io/Python-Forum-API/)
 
-> **ℹ️ CI/CD.** The badges above are live GitHub Actions statuses. The full pipeline —
-> backend tests, frontend build, container publishing to GHCR, CodeQL + Trivy + Gitleaks
-> security scanning, auto-generated API docs, ephemeral-`kind` end-to-end tests, and k6
-> performance checks — is documented in
-> [`docs/23-ci-cd-github-actions.md`](docs/23-ci-cd-github-actions.md).
+</div>
 
 ---
 
@@ -76,6 +73,7 @@ FastAPI backend · React SPA · PostgreSQL · deployed on Kubernetes with full o
 - [Security](#-security)
 - [Testing](#-testing)
   - [Unit & integration tests](#unit--integration-tests)
+  - [Coverage (Codecov)](#coverage-codecov)
   - [Load testing (k6)](#load-testing-k6)
 - [Monitoring & Observability](#-monitoring--observability)
 - [CI/CD Pipeline](#-cicd-pipeline)
@@ -425,7 +423,13 @@ Backend configuration is loaded from environment variables / a `.env` file via
 ## 🔌 API Overview
 
 All endpoints are versioned under `/api/v1`. Interactive documentation is available at
-`/docs` (Swagger UI) and `/redoc`.
+`/docs` (Swagger UI) and `/redoc` when the backend is running.
+
+> 📖 **Live API reference.** A **Redoc** site is auto-generated from the OpenAPI schema on
+> every push to `master` (the `api-docs.yml` workflow) and published to GitHub Pages:
+> **[jakubpatkowski.github.io/Python-Forum-API](https://jakubpatkowski.github.io/Python-Forum-API/)**
+
+[![Live API documentation (Redoc)](./docs/screenshots/api-docs.png)](https://jakubpatkowski.github.io/Python-Forum-API/)
 
 | Module | Selected endpoints |
 |--------|--------------------|
@@ -475,23 +479,92 @@ through token flow, to network isolation in the cluster.
 
 ### Unit & integration tests
 
-Tests run with `pytest` (plus `pytest-asyncio` and `httpx.AsyncClient` for end-to-end API
-tests). Unit tests verify domain logic in isolation; integration tests verify cross-layer
-collaboration.
+Tests run with `pytest` (plus `pytest-asyncio` and `httpx.AsyncClient` / `TestClient` for
+HTTP-level tests). The suite is layered to match Clean Architecture:
+
+- **unit** — pure domain (aggregates, value objects, materialized path, keyset cursor) and the
+  full **application layer** (every use case) driven through in-memory fakes — no I/O, runs in
+  seconds. The *real* Argon2 hasher and PyJWT service are used so signing and refresh-token
+  reuse-detection are genuinely exercised.
+- **e2e (HTTP)** — the real FastAPI app via `TestClient` with the DI container overridden by
+  fakes: routing, request/response DTOs, status codes, the error envelope and the auth
+  dependencies (401 / 403 gates).
+- **integration** — the SQLAlchemy repositories, mappers and unit-of-work against a **real
+  Postgres** spun up with `testcontainers` (requires Docker; run in CI).
 
 ```bash
 cd backend
-uv run pytest                 # run all tests
-uv run pytest --cov=app       # with coverage
+uv run pytest                      # run everything (needs Docker for integration)
+uv run pytest -m "not integration" # fast suite, no Docker
+uv run pytest --cov=app            # with coverage
 ```
 
-| Test area | Scope | Tests |
-|-----------|-------|:-----:|
-| `unit / identity` | RefreshToken, JWT TokenService, User, Value Objects | 27 |
-| `unit / content` | comment materialized path, pagination, Value Objects | 28 |
-| `unit / files` | File aggregate, Value Objects | 22 |
-| `integration / identity` | full login (auth) flow | 1 |
-| `integration / files` | file-module use cases | 11 |
+#### 📊 Test & coverage summary
+
+The table below is **generated automatically** on every backend CI run by
+[`scripts/test_summary.py`](scripts/test_summary.py), which parses the
+`coverage.xml` (Cobertura) and JUnit reports and injects the result between the markers below.
+It is also written to the GitHub Actions **job summary** of each run.
+
+<!-- TEST-SUMMARY:START -->
+
+![tests](https://img.shields.io/badge/tests-233%20passing-2ea44f?logo=pytest&logoColor=white) [![coverage](https://codecov.io/gh/JakubPatkowski/Python-Forum-API/branch/master/graph/badge.svg)](https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API) [![Test Analytics](https://img.shields.io/badge/Codecov-Test%20Analytics-F01F7A?logo=codecov&logoColor=white)](https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API/tests/master)
+
+**233 automated tests** — 233 passed, 0 failed, 0 skipped · **75% line coverage** · ✅ all passing
+
+_Auto-generated from `coverage.xml` + JUnit by `scripts/test_summary.py` on each backend CI run._
+
+**Tests by suite**
+
+| Suite | Tests | Passed | Failed | Skipped |
+|-------|:-----:|:------:|:------:|:-------:|
+| `e2e (HTTP)` | 11 | 11 | 0 | 0 |
+| `integration / files` | 12 | 12 | 0 | 0 |
+| `unit / content` | 99 | 99 | 0 | 0 |
+| `unit / files` | 39 | 39 | 0 | 0 |
+| `unit / identity` | 61 | 61 | 0 | 0 |
+| `unit / shared` | 11 | 11 | 0 | 0 |
+| **Total** | **233** | **233** | **0** | **0** |
+
+**Line coverage by module**
+
+| Module | Coverage | |
+|--------|:--------:|--|
+| `identity` | 79% | `████████░░` |
+| `content` | 77% | `████████░░` |
+| `files` | 67% | `███████░░░` |
+| `engagement` | 47% | `█████░░░░░` |
+| `shared` | 92% | `█████████░` |
+| **overall** | **75%** | `███████░░░` |
+
+<!-- TEST-SUMMARY:END -->
+
+> Numbers above reflect the fast (non-Docker) suite. CI additionally runs the `testcontainers`
+> integration tests and regenerates this block, so the live figures (incl. repository/mapper
+> coverage) are higher.
+
+### Coverage (Codecov)
+
+Both suites upload to **[Codecov](https://codecov.io/gh/JakubPatkowski/Python-Forum-API)** on
+every backend CI run. The unit and integration runs are uploaded as separate **flags** and
+merged per commit; coverage is additionally split into **components** — one per domain module
+(`identity`, `content`, `files`, `engagement`, `shared`) — so it's easy to spot which module
+needs more tests. **Test Analytics** (JUnit results) tracks run times and flaky tests.
+
+[![codecov](https://codecov.io/gh/JakubPatkowski/Python-Forum-API/branch/master/graph/badge.svg)](https://codecov.io/gh/JakubPatkowski/Python-Forum-API)
+[![Codecov components](https://img.shields.io/badge/Codecov-components-F01F7A?logo=codecov&logoColor=white)](https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API/components)
+
+<a href="https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API">
+  <img src="https://codecov.io/gh/JakubPatkowski/Python-Forum-API/branch/master/graphs/sunburst.svg" alt="Codecov coverage sunburst" width="220" />
+</a>
+
+- **Coverage dashboard & file browser** → <https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API>
+- **Components** (per-module coverage: identity / content / files / engagement / shared) → <https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API/components>
+- **Test Analytics** (run times, failure rates, flaky-test detection from the uploaded JUnit results) → <https://app.codecov.io/gh/JakubPatkowski/Python-Forum-API/tests/master>
+
+> The sunburst is rendered live by Codecov from the latest `master` upload (inner ring = repo
+> root, each outer segment = a folder/file, coloured by coverage) — click it for the interactive
+> grid/icicle views. The numeric table above is generated in CI by `scripts/test_summary.py`.
 
 ### Load testing (k6)
 
